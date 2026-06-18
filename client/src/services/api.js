@@ -1,0 +1,80 @@
+import axios from 'axios'
+
+const api = axios.create({
+  baseURL: '/api',
+  headers: { 'Content-Type': 'application/json' },
+})
+
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem('token')
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`
+  }
+  return config
+})
+
+api.interceptors.response.use(
+  (res) => res,
+  (err) => {
+    const isAuthRoute = err.config?.url?.startsWith('/auth/')
+    if (err.response?.status === 401 && !isAuthRoute) {
+      localStorage.removeItem('token')
+      window.location.href = '/auth'
+    }
+    return Promise.reject(err)
+  }
+)
+
+export const authAPI = {
+  register: (data) => api.post('/auth/register', data),
+  login: (data) => api.post('/auth/login', data),
+  getMe: () => api.get('/auth/me'),
+}
+
+export const roomAPI = {
+  create: (data) => api.post('/rooms', data),
+  getAll: () => api.get('/rooms'),
+  getOne: (id) => api.get(`/rooms/${id}`),
+  join: (inviteCode) => api.post('/rooms/join', { inviteCode }),
+  leave: (id) => api.post(`/rooms/${id}/leave`),
+  delete: (id) => api.delete(`/rooms/${id}`),
+}
+
+export const messageAPI = {
+  get: (roomId) => api.get(`/messages/${roomId}`),
+  send: (roomId, data) => api.post(`/messages/${roomId}`, data),
+  delete: (roomId, id) => api.delete(`/messages/${roomId}/${id}`),
+}
+
+export const doubtAPI = {
+  get: (roomId) => api.get(`/doubts/${roomId}`),
+  create: (roomId, data) => api.post(`/doubts/${roomId}`, data),
+  resolve: (id) => api.patch(`/doubts/${id}/resolve`),
+}
+
+export const flashcardAPI = {
+  get: (roomId) => api.get(`/flashcards/${roomId}`),
+  create: (roomId, data) => api.post(`/flashcards/${roomId}`, data),
+  generate: (roomId, topic) => api.post(`/flashcards/${roomId}/generate`, { topic }),
+  delete: (id) => api.delete(`/flashcards/${id}`),
+}
+
+export const sessionAPI = {
+  start: (roomId) => api.post(`/sessions/${roomId}/start`),
+  end: (id) => api.patch(`/sessions/${id}/end`),
+  getAll: () => api.get('/sessions'),
+}
+
+export const notificationAPI = {
+  get: () => api.get('/notifications'),
+  markRead: (id) => api.patch(`/notifications/${id}/read`),
+  markAllRead: () => api.patch('/notifications/read-all'),
+}
+
+export const aiAPI = {
+  ask: (question) => api.post('/ai/ask', { question }),
+  explainDoubt: (id) => api.post(`/ai/explain/${id}`),
+  quiz: (topic, count = 5) => api.post('/ai/quiz', { topic, count }),
+}
+
+export default api
