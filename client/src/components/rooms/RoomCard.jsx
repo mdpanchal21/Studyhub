@@ -1,3 +1,5 @@
+import toast from 'react-hot-toast'
+
 export default function RoomCard({ room, onClick, onLeave }) {
   return (
     <div
@@ -25,7 +27,21 @@ export default function RoomCard({ room, onClick, onLeave }) {
       )}
       <div className="flex items-center justify-between mt-4 text-xs text-gray-400">
         <span>{room.members?.length || 0} members</span>
-        <span className="font-mono">#{room.inviteCode}</span>
+        <span className="relative group">
+          <button
+            onClick={(e) => {
+              e.stopPropagation()
+              navigator.clipboard.writeText(`${window.location.origin}/join/${room.inviteCode}`)
+              toast.success('Invite link copied!')
+            }}
+            className="font-mono text-gray-400 hover:text-indigo-600"
+          >
+            #{room.inviteCode}
+          </button>
+          <span className="absolute -top-8 left-1/2 -translate-x-1/2 bg-gray-800 text-white text-[10px] px-2 py-1 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition pointer-events-none">
+            Copy invite link
+          </span>
+        </span>
       </div>
     </div>
   )

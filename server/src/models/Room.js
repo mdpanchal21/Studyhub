@@ -13,6 +13,11 @@ const roomSchema = new mongoose.Schema({
     role: { type: String, enum: ['admin', 'moderator', 'member'], default: 'member' },
     joinedAt: { type: Date, default: Date.now },
   }],
+  joinRequests: [{
+    user: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    status: { type: String, enum: ['pending', 'accepted', 'declined'], default: 'pending' },
+    requestedAt: { type: Date, default: Date.now },
+  }],
   isActive: { type: Boolean, default: true },
 }, { timestamps: true })
 

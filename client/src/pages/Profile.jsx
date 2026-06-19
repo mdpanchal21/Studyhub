@@ -51,6 +51,21 @@ export default function Profile() {
                   <p className="text-xs text-gray-400">
                     {new Date(s.startTime).toLocaleDateString()}
                   </p>
+                  {s.sessionGroup && (
+                    <div className="flex items-center gap-1 mt-1 flex-wrap">
+                      <span className="text-[10px] text-green-600 font-medium">Group:</span>
+                      {s.sessionGroup.members?.slice(0, 3).map((m) => (
+                        <span key={m.user?._id} className="text-[10px] bg-green-50 text-green-700 px-1.5 py-0.5 rounded">
+                          {m.user?.name}
+                        </span>
+                      ))}
+                      {s.sessionGroup.members?.length > 3 && (
+                        <span className="text-[10px] text-gray-400">
+                          +{s.sessionGroup.members.length - 3}
+                        </span>
+                      )}
+                    </div>
+                  )}
                 </div>
                 <span className="text-sm text-indigo-600 font-medium">
                   {s.durationMinutes || 0} min

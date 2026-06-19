@@ -1,6 +1,5 @@
-import { Worker } from 'bullmq'
 import nodemailer from 'nodemailer'
-import redis from '../config/redis.js'
+import { popEmailJob } from '../queues/emailQueue.js'
 
 const getTransporter = () => {
   if (process.env.RESEND_API_KEY) {
@@ -22,23 +21,31 @@ const getTransporter = () => {
   return null
 }
 
-const emailWorker = new Worker('email-processing', async (job) => {
+const processEmailJob = async (data) => {
   const transporter = getTransporter()
   if (!transporter) {
-    console.log('Email not configured. Skipping email send.')
+    console.log('Email not configured, skipping.')
     return
   }
-  const { to, subject, html } = job.data
   await transporter.sendMail({
     from: '"StudyHub" <noreply@studyhub.app>',
-    to,
-    subject,
-    html,
+    to: data.to,
+    subject: data.subject,
+    html: data.html,
   })
-  console.log(`Email sent to ${to}`)
-}, { connection: redis })
+  console.log(`Email sent to ${data.to}`)
+}
 
-emailWorker.on('completed', (job) => console.log(`Email job ${job.id} completed`))
-emailWorker.on('failed', (job, err) => console.error(`Email job ${job.id} failed:`, err))
-
-export default emailWorker
+export const startEmailWorker = async () => {
+  console.log('Email worker started')
+  while (true) {
+    try {
+      const job = await popEmailJob()
+      if (job) {
+        await processEmailJob(job)
+      }
+    } catch (err) {
+      console.error('Email worker error:', err.message)
+    }
+  }
+}

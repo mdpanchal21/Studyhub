@@ -1,15 +1,18 @@
 import { v4 as uuidv4 } from 'uuid'
 import Room from '../models/Room.js'
+import Notification from '../models/Notification.js'
+
+const notifyUser = async (userId, message, type, link) => {
+  await Notification.create({ user: userId, message, type, link })
+}
+
+// ─── Room CRUD ───
 
 export const createRoom = async (req, res) => {
   try {
     const { name, description, topic, subject, isPrivate } = req.body
     const room = await Room.create({
-      name,
-      description,
-      topic,
-      subject,
-      isPrivate,
+      name, description, topic, subject, isPrivate,
       inviteCode: uuidv4().slice(0, 8),
       createdBy: req.user._id,
       members: [{ user: req.user._id, role: 'admin' }],
@@ -36,6 +39,7 @@ export const getRoom = async (req, res) => {
   try {
     const room = await Room.findById(req.params.id)
       .populate('members.user', 'name email avatar')
+      .populate('joinRequests.user', 'name email')
     if (!room) {
       return res.status(404).json({ message: 'Room not found' })
     }
@@ -44,6 +48,145 @@ export const getRoom = async (req, res) => {
     res.status(500).json({ message: error.message })
   }
 }
+
+export const getRoomByCode = async (req, res) => {
+  try {
+    const room = await Room.findOne({ inviteCode: req.params.inviteCode, isActive: true })
+      .select('name description topic subject members inviteCode isActive')
+    if (!room) {
+      return res.status(404).json({ message: 'Room not found or no longer active' })
+    }
+    res.json({
+      room: {
+        name: room.name,
+        description: room.description,
+        topic: room.topic,
+        subject: room.subject,
+        memberCount: room.members.length,
+        inviteCode: room.inviteCode,
+      }
+    })
+  } catch (error) {
+    res.status(500).json({ message: error.message })
+  }
+}
+
+// ─── Requests ───
+
+export const getPendingRequests = async (req, res) => {
+  try {
+    const room = await Room.findById(req.params.id)
+      .populate('joinRequests.user', 'name email')
+    if (!room) {
+      return res.status(404).json({ message: 'Room not found' })
+    }
+    res.json({ requests: room.joinRequests })
+  } catch (error) {
+    res.status(500).json({ message: error.message })
+  }
+}
+
+export const acceptJoinRequest = async (req, res) => {
+  try {
+    const room = await Room.findById(req.params.id)
+    if (!room) {
+      return res.status(404).json({ message: 'Room not found' })
+    }
+
+    const requestIdx = room.joinRequests.findIndex(
+      (r) => r.user.toString() === req.params.userId && r.status === 'pending'
+    )
+    if (requestIdx === -1) {
+      return res.status(404).json({ message: 'Pending request not found' })
+    }
+
+    room.joinRequests[requestIdx].status = 'accepted'
+    room.members.push({ user: req.params.userId, role: 'member' })
+    room.joinRequests.splice(requestIdx, 1)
+    await room.save()
+
+    const populated = await Room.findById(room._id)
+      .populate('members.user', 'name email avatar')
+      .populate('joinRequests.user', 'name email')
+
+    const newMember = populated.members.find(
+      (m) => m.user._id.toString() === req.params.userId
+    )
+
+    const io = req.app.get('io')
+    if (io) {
+      io.to(room._id.toString()).emit('member-joined', { member: newMember })
+      io.to(room._id.toString()).emit('request-accepted', {
+        userId: req.params.userId,
+        room: populated,
+      })
+      const targetSocketId = io.onlineUsers?.get(req.params.userId)
+      if (targetSocketId) {
+        io.to(targetSocketId).emit('request-accepted', {
+          roomId: room._id,
+          room: populated,
+        })
+      }
+    }
+
+    await notifyUser(
+      req.params.userId,
+      `Your request to join "${room.name}" was accepted`,
+      'info',
+      `/room/${room._id}`
+    )
+
+    res.json({ room: populated })
+  } catch (error) {
+    res.status(500).json({ message: error.message })
+  }
+}
+
+export const declineJoinRequest = async (req, res) => {
+  try {
+    const room = await Room.findById(req.params.id)
+    if (!room) {
+      return res.status(404).json({ message: 'Room not found' })
+    }
+
+    const requestIdx = room.joinRequests.findIndex(
+      (r) => r.user.toString() === req.params.userId && r.status === 'pending'
+    )
+    if (requestIdx === -1) {
+      return res.status(404).json({ message: 'Pending request not found' })
+    }
+
+    room.joinRequests.splice(requestIdx, 1)
+    await room.save()
+
+    const io = req.app.get('io')
+    if (io) {
+      io.to(room._id.toString()).emit('request-declined', {
+        userId: req.params.userId,
+      })
+      const targetSocketId = io.onlineUsers?.get(req.params.userId)
+      if (targetSocketId) {
+        io.to(targetSocketId).emit('request-declined', {
+          userId: req.params.userId,
+          roomId: room._id,
+          roomName: room.name,
+        })
+      }
+    }
+
+    await notifyUser(
+      req.params.userId,
+      `Your request to join "${room.name}" was declined`,
+      'info'
+    )
+
+    res.json({ message: 'Request declined' })
+  } catch (error) {
+    res.status(500).json({ message: error.message })
+  }
+}
+
+// ─── Join / Leave / Kick ───
 
 export const joinRoom = async (req, res) => {
   try {
@@ -58,9 +201,40 @@ export const joinRoom = async (req, res) => {
     if (alreadyMember) {
       return res.status(400).json({ message: 'Already a member' })
     }
-    room.members.push({ user: req.user._id, role: 'member' })
+
+    const alreadyRequested = room.joinRequests.find(
+      (r) => r.user.toString() === req.user._id.toString() && r.status === 'pending'
+    )
+    if (alreadyRequested) {
+      return res.status(400).json({ message: 'Join request already pending' })
+    }
+
+    room.joinRequests.push({ user: req.user._id, status: 'pending' })
     await room.save()
-    res.json({ room })
+
+    const populated = await Room.findById(room._id)
+      .populate('joinRequests.user', 'name email')
+
+    const newRequest = populated.joinRequests.find(
+      (r) => r.user._id.toString() === req.user._id.toString()
+    )
+
+    const io = req.app.get('io')
+    if (io) {
+      io.to(room._id.toString()).emit('join-request', { request: newRequest })
+    }
+
+    const adminMembers = room.members.filter((m) => m.role === 'admin')
+    for (const admin of adminMembers) {
+      await notifyUser(
+        admin.user,
+        `${req.user.name} wants to join "${room.name}"`,
+        'join_request',
+        `/room/${room._id}`
+      )
+    }
+
+    res.json({ message: 'Join request sent', request: newRequest })
   } catch (error) {
     res.status(500).json({ message: error.message })
   }
@@ -76,7 +250,64 @@ export const leaveRoom = async (req, res) => {
       (m) => m.user.toString() !== req.user._id.toString()
     )
     await room.save()
+
+    const io = req.app.get('io')
+    if (io) {
+      io.to(req.params.id).emit('member-left', {
+        userId: req.user._id,
+      })
+    }
+
     res.json({ message: 'Left room' })
+  } catch (error) {
+    res.status(500).json({ message: error.message })
+  }
+}
+
+export const kickMember = async (req, res) => {
+  try {
+    const room = await Room.findById(req.params.id)
+    if (!room) {
+      return res.status(404).json({ message: 'Room not found' })
+    }
+
+    const targetId = req.params.userId
+    if (targetId === req.user._id.toString()) {
+      return res.status(400).json({ message: 'Cannot kick yourself' })
+    }
+
+    const targetMember = room.members.find(
+      (m) => m.user.toString() === targetId
+    )
+    if (!targetMember) {
+      return res.status(404).json({ message: 'User not a member' })
+    }
+
+    room.members = room.members.filter(
+      (m) => m.user.toString() !== targetId
+    )
+    await room.save()
+
+    const io = req.app.get('io')
+    if (io) {
+      io.to(req.params.id).emit('member-left', { userId: targetId })
+      const kickedSocketId = io.onlineUsers?.get(targetId)
+      if (kickedSocketId) {
+        io.to(kickedSocketId).emit('kicked', {
+          userId: targetId,
+          roomId: room._id,
+          roomName: room.name,
+        })
+      }
+    }
+
+    await notifyUser(
+      targetId,
+      `You were removed from "${room.name}" by the admin`,
+      'info'
+    )
+
+    res.json({ message: 'Member kicked' })
   } catch (error) {
     res.status(500).json({ message: error.message })
   }

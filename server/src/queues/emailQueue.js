@@ -1,10 +1,13 @@
-import { Queue } from 'bullmq'
 import redis from '../config/redis.js'
 
-const emailQueue = new Queue('email-processing', { connection: redis })
+const QUEUE_KEY = 'queue:email'
 
-export const addEmailJob = async ({ to, subject, html }) => {
-  return emailQueue.add('send-email', { to, subject, html })
+export const addEmailJob = async (data) => {
+  await redis.lpush(QUEUE_KEY, JSON.stringify(data))
 }
 
-export default emailQueue
+export const popEmailJob = async () => {
+  const result = await redis.brpop(QUEUE_KEY, 1)
+  if (!result) return null
+  return JSON.parse(result[1])
+}

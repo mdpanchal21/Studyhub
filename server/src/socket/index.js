@@ -3,7 +3,7 @@ import jwt from 'jsonwebtoken'
 import User from '../models/User.js'
 import Message from '../models/Message.js'
 
-const setupSocket = (server) => {
+const setupSocket = (server, app) => {
   const io = new Server(server, {
     cors: {
       origin: process.env.CLIENT_URL || 'http://localhost:5173',
@@ -11,7 +11,10 @@ const setupSocket = (server) => {
     },
   })
 
+  app.set('io', io)
+
   const onlineUsers = new Map()
+  io.onlineUsers = onlineUsers
 
   io.use(async (socket, next) => {
     try {
@@ -30,6 +33,7 @@ const setupSocket = (server) => {
   io.on('connection', (socket) => {
     console.log(`User connected: ${socket.user.name}`)
     onlineUsers.set(socket.user._id.toString(), socket.id)
+    socket.join(socket.user._id.toString())
 
     socket.on('join-room', (roomId) => {
       socket.join(roomId)
@@ -76,6 +80,22 @@ const setupSocket = (server) => {
         doubtId: data.doubtId,
         status: 'resolved',
       })
+    })
+
+    socket.on('session-started', (data) => {
+      io.to(data.roomId).emit('session-update', { action: 'started', session: data.session })
+    })
+
+    socket.on('session-joined', (data) => {
+      io.to(data.roomId).emit('session-update', { action: 'joined', session: data.session })
+    })
+
+    socket.on('session-left', (data) => {
+      io.to(data.roomId).emit('session-update', { action: 'left', session: data.session })
+    })
+
+    socket.on('session-ended', (data) => {
+      io.to(data.roomId).emit('session-update', { action: 'ended' })
     })
 
     socket.on('disconnect', () => {

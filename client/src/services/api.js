@@ -35,9 +35,15 @@ export const roomAPI = {
   create: (data) => api.post('/rooms', data),
   getAll: () => api.get('/rooms'),
   getOne: (id) => api.get(`/rooms/${id}`),
+  getByCode: (inviteCode) => api.get(`/rooms/by-code/${inviteCode}`),
   join: (inviteCode) => api.post('/rooms/join', { inviteCode }),
+  requestJoin: (inviteCode) => api.post('/rooms/request-join', { inviteCode }),
   leave: (id) => api.post(`/rooms/${id}/leave`),
   delete: (id) => api.delete(`/rooms/${id}`),
+  getPendingRequests: (id) => api.get(`/rooms/${id}/requests`),
+  acceptRequest: (id, userId) => api.post(`/rooms/${id}/requests/${userId}/accept`),
+  declineRequest: (id, userId) => api.post(`/rooms/${id}/requests/${userId}/decline`),
+  kickMember: (id, userId) => api.post(`/rooms/${id}/members/${userId}/kick`),
 }
 
 export const messageAPI = {
@@ -75,6 +81,14 @@ export const aiAPI = {
   ask: (question) => api.post('/ai/ask', { question }),
   explainDoubt: (id) => api.post(`/ai/explain/${id}`),
   quiz: (topic, count = 5) => api.post('/ai/quiz', { topic, count }),
+}
+
+export const roomSessionAPI = {
+  getActive: (roomId) => api.get(`/rooms/${roomId}/active-session`),
+  start: (roomId, topic) => api.post(`/rooms/${roomId}/sessions/start`, { topic }),
+  join: (roomId) => api.post(`/rooms/${roomId}/sessions/join`),
+  leave: (roomId) => api.post(`/rooms/${roomId}/sessions/leave`),
+  end: (roomId) => api.post(`/rooms/${roomId}/sessions/end`),
 }
 
 export default api

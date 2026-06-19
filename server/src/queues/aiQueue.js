@@ -1,14 +1,17 @@
-import { Queue } from 'bullmq'
 import redis from '../config/redis.js'
 
-const aiQueue = new Queue('ai-processing', { connection: redis })
+const QUEUE_KEY = 'queue:ai'
 
-export const addAIJob = async ({ doubtId, title, description }) => {
-  return aiQueue.add('answer-doubt', { doubtId, title, description })
+export const addAIJob = async (data) => {
+  await redis.lpush(QUEUE_KEY, JSON.stringify(data))
 }
 
-export const addFlashcardJob = async ({ userId, roomId, topic }) => {
-  return aiQueue.add('generate-flashcards', { userId, roomId, topic })
+export const addFlashcardJob = async (data) => {
+  await redis.lpush(QUEUE_KEY, JSON.stringify({ ...data, type: 'flashcard' }))
 }
 
-export default aiQueue
+export const popAIJob = async () => {
+  const result = await redis.brpop(QUEUE_KEY, 1)
+  if (!result) return null
+  return JSON.parse(result[1])
+}

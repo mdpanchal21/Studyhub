@@ -9,6 +9,7 @@ import messageRoutes from './routes/messages.js'
 import doubtRoutes from './routes/doubts.js'
 import flashcardRoutes from './routes/flashcards.js'
 import studySessionRoutes from './routes/studySessions.js'
+import roomSessionRoutes from './routes/roomSessions.js'
 import notificationRoutes from './routes/notifications.js'
 import aiRoutes from './routes/ai.js'
 
@@ -24,6 +25,7 @@ app.use('/api/messages', messageRoutes)
 app.use('/api/doubts', doubtRoutes)
 app.use('/api/flashcards', flashcardRoutes)
 app.use('/api/sessions', studySessionRoutes)
+app.use('/api/rooms', roomSessionRoutes)
 app.use('/api/notifications', notificationRoutes)
 app.use('/api/ai', aiRoutes)
 

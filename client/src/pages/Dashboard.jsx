@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { roomAPI } from '../services/api'
+import { on as onSocketEvent } from '../services/socket'
 import RoomCard from '../components/rooms/RoomCard'
 import CreateRoomModal from '../components/rooms/CreateRoomModal'
 import toast from 'react-hot-toast'
@@ -22,13 +23,31 @@ export default function Dashboard() {
 
   useEffect(() => { fetchRooms() }, [])
 
+  useEffect(() => {
+    const unsubs = [
+      onSocketEvent('request-accepted', ({ roomId: acceptedRoomId }) => {
+        toast.success('Your join request was accepted! Redirecting...')
+        navigate(`/room/${acceptedRoomId}`)
+      }),
+      onSocketEvent('request-declined', ({ roomName }) => {
+        toast(`${roomName || 'Room'} request was declined`, { icon: '❌' })
+      }),
+      onSocketEvent('kicked', ({ roomName, roomId }) => {
+        toast(`${roomName || 'Room'}: You were removed by the admin`, { icon: '🚫' })
+        setRooms((prev) => prev.filter((r) => r._id !== roomId))
+        fetchRooms()
+      }),
+    ]
+
+    return () => unsubs.forEach((fn) => fn())
+  }, [])
+
   const handleJoin = async () => {
     if (!joinCode.trim()) return
     try {
-      await roomAPI.join(joinCode.trim())
-      toast.success('Joined room!')
+      const res = await roomAPI.join(joinCode.trim())
+      toast.success(res.data.message || 'Join request sent!')
       setJoinCode('')
-      fetchRooms()
     } catch (err) {
       toast.error(err.response?.data?.message || 'Invalid code')
     }

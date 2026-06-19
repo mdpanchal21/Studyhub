@@ -37,6 +37,10 @@ export const getSessions = async (req, res) => {
   try {
     const sessions = await StudySession.find({ user: req.user._id })
       .populate('room', 'name')
+      .populate({
+        path: 'sessionGroup',
+        populate: { path: 'members.user', select: 'name' },
+      })
       .sort({ createdAt: -1 })
       .limit(20)
     res.json({ sessions })
