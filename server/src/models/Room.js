@@ -19,6 +19,8 @@ const roomSchema = new mongoose.Schema({
     requestedAt: { type: Date, default: Date.now },
   }],
   isActive: { type: Boolean, default: true },
+  dailyRoomUrl: { type: String, default: null },
+  dailyRoomName: { type: String, default: null },
 }, { timestamps: true })
 
 export default mongoose.model('Room', roomSchema)

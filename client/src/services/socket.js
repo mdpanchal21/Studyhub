@@ -8,7 +8,7 @@ const dispatchers = {}
 export const connectSocket = (token) => {
   if (socket?.connected) return socket
 
-  socket = io('http://172.16.16.108:5000', {
+  socket = io({
     auth: { token },
     transports: ['websocket'],
     reconnection: true,

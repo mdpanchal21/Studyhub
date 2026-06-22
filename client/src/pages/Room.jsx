@@ -32,6 +32,7 @@ export default function Room() {
   const [sessionTimer, setSessionTimer] = useState(0)
   const [pendingRequests, setPendingRequests] = useState([])
   const [loading, setLoading] = useState(true)
+  const [videoActive, setVideoActive] = useState(false)
 
   useEffect(() => {
     roomAPI.getOne(id)
@@ -491,7 +492,7 @@ export default function Room() {
         </div>
       </div>
 
-      <div className="w-80 space-y-4">
+      <div className={`${videoActive ? 'w-[480px]' : 'w-80'} space-y-4`}>
         <div className="bg-white rounded-xl shadow-sm border p-4">
           <h2 className="font-bold text-lg mb-1">{room.name}</h2>
           {room.topic && (
@@ -557,7 +558,7 @@ export default function Room() {
         )}
 
         <div className="bg-white rounded-xl shadow-sm border p-4">
-          <VideoCall roomId={id} roomName={room.name} />
+          <VideoCall roomId={id} roomName={room.name} isAdmin={isAdmin} onActiveChange={setVideoActive} />
         </div>
       </div>
     </div>
