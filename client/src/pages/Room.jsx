@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { roomAPI, messageAPI, doubtAPI, flashcardAPI, roomSessionAPI } from '../services/api'
 import { getSocket, onReconnect, on as onSocketEvent } from '../services/socket'
 import { useAuth } from '../context/AuthContext'
+import { useSocket } from '../context/SocketContext'
 import MessageList from '../components/chat/MessageList'
 import MessageInput from '../components/chat/MessageInput'
 import TypingIndicator from '../components/chat/TypingIndicator'
@@ -17,6 +18,7 @@ export default function Room() {
   const { id } = useParams()
   const navigate = useNavigate()
   const { user } = useAuth()
+  const { socketReady } = useSocket()  // true once socket is fully connected
   const typingTimeoutRef = useRef(null)
   const prevRoomIdRef = useRef(null)
   const userRef = useRef(user)
@@ -92,30 +94,36 @@ export default function Room() {
     return () => clearInterval(interval)
   }, [roomSession?._id, roomSession?.active])
 
+  // ─── Socket: join room ────────────────────────────────────────────────────
+  // Depends on `socketReady` so this effect re-runs the moment the socket
+  // becomes connected (avoiding the race condition where getSocket() was null).
   useEffect(() => {
+    if (!socketReady) return  // wait for socket to be connected
+
     const socket = getSocket()
     if (!socket) return
 
+    // Leave previous room if navigating between rooms
     if (prevRoomIdRef.current && prevRoomIdRef.current !== id) {
       socket.emit('leave-room', prevRoomIdRef.current)
     }
     prevRoomIdRef.current = id
 
-    const joinRoom = () => {
-      if (socket.connected) {
-        socket.emit('join-room', id)
-        fetchData()
-      }
-    }
+    // Join current room and fetch latest data
+    socket.emit('join-room', id)
+    fetchData()
 
-    joinRoom()
-    const unsubReconnect = onReconnect(joinRoom)
+    // Re-join room on reconnect and refresh data to catch missed events
+    const unsubReconnect = onReconnect(() => {
+      socket.emit('join-room', id)
+      fetchData()
+    })
 
     return () => {
       unsubReconnect()
       socket.emit('leave-room', id)
     }
-  }, [id])
+  }, [id, socketReady, fetchData])
 
   useEffect(() => {
     const unsubs = [

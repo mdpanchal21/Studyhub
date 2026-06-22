@@ -16,7 +16,7 @@ import aiRoutes from './routes/ai.js'
 
 const app = express()
 
-app.use(cors({ origin: [process.env.CLIENT_URL, 'http://172.16.16.108:5173'].filter(Boolean), credentials: true }))
+app.use(cors({ origin: process.env.CLIENT_URL.split(','), credentials: true }))
 app.use(express.json())
 app.use(morgan('dev'))
 

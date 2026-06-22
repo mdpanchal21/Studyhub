@@ -104,9 +104,10 @@ export const joinSession = async (req, res) => {
       .populate('startedBy', 'name email avatar')
       .populate('members.user', 'name email avatar')
 
-    const room = await Room.findById(req.params.roomId)
     const io = req.app.get('io')
     if (io) {
+      // Only notify admins when a member joins a session
+      const room = await Room.findById(req.params.roomId)
       const adminMembers = room.members.filter((m) => m.role === 'admin')
       for (const admin of adminMembers) {
         io.to(admin.user.toString()).emit('session-toast', {
@@ -151,16 +152,15 @@ export const leaveSession = async (req, res) => {
       .populate('startedBy', 'name email avatar')
       .populate('members.user', 'name email avatar')
 
-    const room = await Room.findById(req.params.roomId)
     const io = req.app.get('io')
-    if (io) {
-      if (!lastMember) {
-        const adminMembers = room.members.filter((m) => m.role === 'admin')
-        for (const admin of adminMembers) {
-          io.to(admin.user.toString()).emit('session-toast', {
-            type: 'left', userName: req.user.name,
-          })
-        }
+    if (io && !lastMember) {
+      // Only notify admins when a member leaves a session
+      const room = await Room.findById(req.params.roomId)
+      const adminMembers = room.members.filter((m) => m.role === 'admin')
+      for (const admin of adminMembers) {
+        io.to(admin.user.toString()).emit('session-toast', {
+          type: 'left', userName: req.user.name,
+        })
       }
     }
 

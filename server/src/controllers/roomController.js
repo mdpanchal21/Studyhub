@@ -2,8 +2,17 @@ import { v4 as uuidv4 } from 'uuid'
 import Room from '../models/Room.js'
 import Notification from '../models/Notification.js'
 
-const notifyUser = async (userId, message, type, link) => {
-  await Notification.create({ user: userId, message, type, link })
+/**
+ * Persist a notification and push it to the user's socket room in real-time.
+ * io is optional — if not available, silently skips the socket push.
+ */
+const notifyUser = async (userId, message, type, link, io = null) => {
+  const notification = await Notification.create({ user: userId, message, type, link })
+  if (io) {
+    // Each connected user is in a personal socket room keyed by their userId
+    io.to(userId.toString()).emit('new-notification', notification)
+  }
+  return notification
 }
 
 // ─── Room CRUD ───
@@ -115,25 +124,24 @@ export const acceptJoinRequest = async (req, res) => {
 
     const io = req.app.get('io')
     if (io) {
+      // Notify everyone already in the room that a new member joined
       io.to(room._id.toString()).emit('member-joined', { member: newMember })
-      io.to(room._id.toString()).emit('request-accepted', {
-        userId: req.params.userId,
+
+      // Notify ONLY the accepted user (via personal socket room) with roomId
+      // so the Dashboard can redirect them
+      io.to(req.params.userId).emit('request-accepted', {
+        roomId: room._id,
+        roomName: room.name,
         room: populated,
       })
-      const targetSocketId = io.onlineUsers?.get(req.params.userId)
-      if (targetSocketId) {
-        io.to(targetSocketId).emit('request-accepted', {
-          roomId: room._id,
-          room: populated,
-        })
-      }
     }
 
     await notifyUser(
       req.params.userId,
       `Your request to join "${room.name}" was accepted`,
-      'info',
-      `/room/${room._id}`
+      'join_request',
+      `/room/${room._id}`,
+      io
     )
 
     res.json({ room: populated })
@@ -161,23 +169,20 @@ export const declineJoinRequest = async (req, res) => {
 
     const io = req.app.get('io')
     if (io) {
-      io.to(room._id.toString()).emit('request-declined', {
+      // Notify ONLY the declined user (via personal socket room)
+      io.to(req.params.userId).emit('request-declined', {
         userId: req.params.userId,
+        roomId: room._id,
+        roomName: room.name,
       })
-      const targetSocketId = io.onlineUsers?.get(req.params.userId)
-      if (targetSocketId) {
-        io.to(targetSocketId).emit('request-declined', {
-          userId: req.params.userId,
-          roomId: room._id,
-          roomName: room.name,
-        })
-      }
     }
 
     await notifyUser(
       req.params.userId,
       `Your request to join "${room.name}" was declined`,
-      'info'
+      'info',
+      null,
+      io
     )
 
     res.json({ message: 'Request declined' })
@@ -221,16 +226,19 @@ export const joinRoom = async (req, res) => {
 
     const io = req.app.get('io')
     if (io) {
+      // Emit join-request to room (admins in the room see it live)
       io.to(room._id.toString()).emit('join-request', { request: newRequest })
     }
 
+    // Persist notification and push real-time to each admin's personal socket room
     const adminMembers = room.members.filter((m) => m.role === 'admin')
     for (const admin of adminMembers) {
       await notifyUser(
         admin.user,
         `${req.user.name} wants to join "${room.name}"`,
         'join_request',
-        `/room/${room._id}`
+        `/room/${room._id}`,
+        io
       )
     }
 
@@ -290,21 +298,22 @@ export const kickMember = async (req, res) => {
 
     const io = req.app.get('io')
     if (io) {
+      // Tell the room the member left
       io.to(req.params.id).emit('member-left', { userId: targetId })
-      const kickedSocketId = io.onlineUsers?.get(targetId)
-      if (kickedSocketId) {
-        io.to(kickedSocketId).emit('kicked', {
-          userId: targetId,
-          roomId: room._id,
-          roomName: room.name,
-        })
-      }
+      // Tell the kicked user directly via their personal socket room
+      io.to(targetId).emit('kicked', {
+        userId: targetId,
+        roomId: room._id,
+        roomName: room.name,
+      })
     }
 
     await notifyUser(
       targetId,
       `You were removed from "${room.name}" by the admin`,
-      'info'
+      'info',
+      null,
+      io
     )
 
     res.json({ message: 'Member kicked' })
