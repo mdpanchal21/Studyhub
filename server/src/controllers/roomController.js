@@ -1,5 +1,9 @@
 import { v4 as uuidv4 } from 'uuid'
 import Room from '../models/Room.js'
+import Message from '../models/Message.js'
+import Doubt from '../models/Doubt.js'
+import Flashcard from '../models/Flashcard.js'
+import RoomSession from '../models/RoomSession.js'
 import Notification from '../models/Notification.js'
 
 /**
@@ -34,11 +38,26 @@ export const createRoom = async (req, res) => {
 
 export const getRooms = async (req, res) => {
   try {
-    const rooms = await Room.find({
+    const page = Math.max(parseInt(req.query.page) || 1, 1)
+    const limit = Math.min(parseInt(req.query.limit) || 20, 50)
+    const skip = (page - 1) * limit
+    const search = req.query.search || ''
+
+    const filter = {
       'members.user': req.user._id,
       isActive: true,
-    }).populate('members.user', 'name email avatar')
-    res.json({ rooms })
+    }
+
+    if (search) {
+      filter.name = { $regex: search, $options: 'i' }
+    }
+
+    const [rooms, total] = await Promise.all([
+      Room.find(filter).populate('members.user', 'name email avatar').sort({ updatedAt: -1 }).skip(skip).limit(limit),
+      Room.countDocuments(filter),
+    ])
+
+    res.json({ rooms, total, page, totalPages: Math.ceil(total / limit) })
   } catch (error) {
     res.status(500).json({ message: error.message })
   }
@@ -334,6 +353,67 @@ export const deleteRoom = async (req, res) => {
     room.isActive = false
     await room.save()
     res.json({ message: 'Room deleted' })
+  } catch (error) {
+    res.status(500).json({ message: error.message })
+  }
+}
+
+export const deactivateRoom = async (req, res) => {
+  try {
+    const room = await Room.findById(req.params.id)
+    if (!room) {
+      return res.status(404).json({ message: 'Room not found' })
+    }
+
+    await Promise.all([
+      Message.deleteMany({ room: req.params.id }),
+      Doubt.deleteMany({ room: req.params.id }),
+      Flashcard.deleteMany({ room: req.params.id }),
+      RoomSession.deleteMany({ room: req.params.id }),
+    ])
+
+    room.dailyRoomUrl = null
+    room.dailyRoomName = null
+    room.joinRequests = []
+    room.isActive = false
+    await room.save()
+
+    const io = req.app.get('io')
+    if (io) {
+      io.to(req.params.id).emit('room-deactivated', {
+        roomId: room._id,
+        roomName: room.name,
+      })
+    }
+
+    res.json({ message: 'Room deactivated' })
+  } catch (error) {
+    res.status(500).json({ message: error.message })
+  }
+}
+
+export const getRoomHistory = async (req, res) => {
+  try {
+    const page = Math.max(parseInt(req.query.page) || 1, 1)
+    const limit = Math.min(parseInt(req.query.limit) || 20, 50)
+    const skip = (page - 1) * limit
+    const search = req.query.search || ''
+
+    const filter = {
+      createdBy: req.user._id,
+      isActive: false,
+    }
+
+    if (search) {
+      filter.name = { $regex: search, $options: 'i' }
+    }
+
+    const [rooms, total] = await Promise.all([
+      Room.find(filter).populate('members.user', 'name email avatar').select('name topic description members createdBy createdAt updatedAt').sort({ updatedAt: -1 }).skip(skip).limit(limit),
+      Room.countDocuments(filter),
+    ])
+
+    res.json({ rooms, total, page, totalPages: Math.ceil(total / limit) })
   } catch (error) {
     res.status(500).json({ message: error.message })
   }

@@ -2,6 +2,7 @@ import { getAIResponse } from '../config/ai.js'
 import Doubt from '../models/Doubt.js'
 import Flashcard from '../models/Flashcard.js'
 import { popAIJob } from '../queues/aiQueue.js'
+import { getIO } from '../socket/index.js'
 import redis from '../config/redis.js'
 
 const processAIJob = async (data) => {
@@ -26,8 +27,20 @@ const processAIJob = async (data) => {
   if (doubtId) {
     const prompt = `Answer this doubt in detail:\nTitle: ${title}\nDescription: ${description}`
     const result = await getAIResponse(prompt)
-    await Doubt.findByIdAndUpdate(doubtId, { aiAnswer: result.text, status: 'ai_answered' })
+    const doubt = await Doubt.findByIdAndUpdate(
+      doubtId,
+      { aiAnswer: result.text, status: 'ai_answered' },
+      { new: true }
+    )
     console.log(`AI answered doubt: ${doubtId}`)
+    const io = getIO()
+    if (io && doubt) {
+      io.to(doubt.room.toString()).emit('doubt-update', {
+        doubtId: doubt._id,
+        status: 'ai_answered',
+        aiAnswer: result.text,
+      })
+    }
   }
 }
 

@@ -14,12 +14,19 @@ export default function DoubtCard({ doubt, onResolve }) {
             </span>
           </div>
           <p className="text-sm text-gray-600 mt-1">{doubt.description}</p>
-          {doubt.aiAnswer && (
+          {doubt.aiAnswer ? (
             <div className="mt-3 bg-indigo-50 rounded-lg p-3">
               <p className="text-xs font-semibold text-indigo-600 mb-1">AI Answer</p>
               <p className="text-sm text-gray-700">{doubt.aiAnswer}</p>
             </div>
-          )}
+          ) : doubt.status === 'open' ? (
+            <div className="mt-3 bg-gray-50 rounded-lg p-3 border border-dashed border-gray-200">
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 bg-indigo-400 rounded-full animate-pulse" />
+                <p className="text-xs text-indigo-500 font-medium">AI is thinking...</p>
+              </div>
+            </div>
+          ) : null}
         </div>
         {doubt.status !== 'resolved' && (
           <button

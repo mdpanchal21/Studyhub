@@ -13,7 +13,7 @@ export const getAIResponse = async (prompt) => {
     return { text: 'AI not configured. Set GEMINI_API_KEY in .env' }
   }
   try {
-    const model = genAI.getGenerativeModel({ model: 'gemini-pro' })
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' })
     const result = await model.generateContent(prompt)
     return { text: result.response.text() }
   } catch (error) {

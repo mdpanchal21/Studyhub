@@ -7,4 +7,6 @@ const messageSchema = new mongoose.Schema({
   type: { type: String, enum: ['text', 'code', 'image'], default: 'text' },
 }, { timestamps: true })
 
+messageSchema.index({ createdAt: 1 }, { expireAfterSeconds: 604800 })
+
 export default mongoose.model('Message', messageSchema)

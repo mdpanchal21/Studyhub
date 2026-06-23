@@ -2,8 +2,8 @@ import { useState, useEffect } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { roomAPI } from '../services/api'
 import { useAuth } from '../context/AuthContext'
+import Skeleton from 'react-loading-skeleton'
 import { on as onSocketEvent } from '../services/socket'
-import Loading from '../components/common/Loading'
 import toast from 'react-hot-toast'
 
 export default function JoinByLink() {
@@ -46,7 +46,19 @@ export default function JoinByLink() {
     }
   }
 
-  if (loading) return <Loading />
+  if (loading) return (
+    <div className="min-h-[60vh] flex items-center justify-center">
+      <div className="bg-white rounded-2xl shadow-lg border p-8 w-full max-w-md">
+        <div className="text-center mb-6">
+          <Skeleton height={48} width={48} circle className="mx-auto mb-3" />
+          <Skeleton height={28} width="60%" className="mx-auto mb-2" />
+          <Skeleton height={14} width="40%" className="mx-auto" />
+        </div>
+        <Skeleton height={40} className="mb-4" />
+        <Skeleton height={40} />
+      </div>
+    </div>
+  )
 
   if (error) {
     return (

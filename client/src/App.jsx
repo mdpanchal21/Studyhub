@@ -8,6 +8,7 @@ import Flashcards from './pages/Flashcards'
 import Profile from './pages/Profile'
 import JoinByLink from './pages/JoinByLink'
 import Loading from './components/common/Loading'
+import 'react-loading-skeleton/dist/skeleton.css'
 
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth()
@@ -17,9 +18,7 @@ function ProtectedRoute({ children }) {
 }
 
 export default function App() {
-  const { user, loading } = useAuth()
-
-  if (loading) return <Loading />
+  const { user } = useAuth()
 
   return (
     <div className="min-h-screen bg-gray-50">

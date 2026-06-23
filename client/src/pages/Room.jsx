@@ -11,6 +11,7 @@ import MemberList from '../components/rooms/MemberList'
 import DoubtList from '../components/doubts/DoubtList'
 import DoubtForm from '../components/doubts/DoubtForm'
 import FlashcardList from '../components/flashcards/FlashcardList'
+import Skeleton from 'react-loading-skeleton'
 import VideoCall from '../components/video/VideoCall'
 import toast from 'react-hot-toast'
 
@@ -25,6 +26,8 @@ export default function Room() {
   userRef.current = user
 
   const [room, setRoom] = useState(null)
+  const roomRef = useRef(room)
+  useEffect(() => { roomRef.current = room }, [room])
   const [activeTab, setActiveTab] = useState('chat')
   const [messages, setMessages] = useState([])
   const [doubts, setDoubts] = useState([])
@@ -35,6 +38,10 @@ export default function Room() {
   const [pendingRequests, setPendingRequests] = useState([])
   const [loading, setLoading] = useState(true)
   const [videoActive, setVideoActive] = useState(false)
+  const [showLeaveConfirm, setShowLeaveConfirm] = useState(false)
+  const [showDeactivateConfirm, setShowDeactivateConfirm] = useState(false)
+  const [hasMoreMessages, setHasMoreMessages] = useState(false)
+  const [loadingOlder, setLoadingOlder] = useState(false)
 
   useEffect(() => {
     roomAPI.getOne(id)
@@ -47,7 +54,10 @@ export default function Room() {
   }, [id])
 
   const fetchData = useCallback(() => {
-    messageAPI.get(id).then((res) => setMessages(res.data.messages)).catch(() => {})
+    messageAPI.get(id).then((res) => {
+      setMessages(res.data.messages)
+      setHasMoreMessages(res.data.hasMore)
+    }).catch(() => {})
     doubtAPI.get(id).then((res) => setDoubts(res.data.doubts)).catch(() => {})
     flashcardAPI.get(id).then((res) => setFlashcards(res.data.flashcards)).catch(() => {})
     roomSessionAPI.getActive(id).then((res) => setRoomSession(res.data.session)).catch(() => {})
@@ -151,10 +161,13 @@ export default function Room() {
         toast(`${member.user?.name} joined the room`, { icon: '👋' })
       }),
       onSocketEvent('member-left', ({ userId }) => {
-        setRoom((prev) => prev ? {
-          ...prev,
-          members: prev.members.filter((m) => m.user?._id !== userId),
-        } : prev)
+        const leftMember = roomRef.current?.members?.find((m) => m.user?._id === userId)
+        if (leftMember) toast(`${leftMember.user?.name || 'A user'} left the room`, { icon: '🚪' })
+
+        setRoom((prev) => {
+          if (!prev) return prev
+          return { ...prev, members: prev.members.filter((m) => m.user?._id !== userId) }
+        })
       }),
       onSocketEvent('join-request', ({ request }) => {
         setPendingRequests((prev) => {
@@ -194,17 +207,22 @@ export default function Room() {
           if (msg) toast.success(msg)
         }
       }),
-      onSocketEvent('doubt-update', ({ doubtId, status }) => {
+      onSocketEvent('doubt-update', ({ doubtId, status, aiAnswer }) => {
+        console.log('[Socket] doubt-update received:', doubtId, status)
         setDoubts((prev) => prev.map((d) =>
-          d._id === doubtId ? { ...d, status } : d
+          d._id === doubtId ? { ...d, status, ...(aiAnswer ? { aiAnswer } : {}) } : d
         ))
+      }),
+      onSocketEvent('room-deactivated', ({ roomName }) => {
+        toast(`${roomName || 'Room'} was deactivated by the admin`, { icon: '🚫' })
+        navigate('/')
       }),
     ]
 
     return () => {
       unsubs.forEach((fn) => fn())
     }
-  }, [id])
+  }, [id, navigate])
 
   const handleSendMessage = useCallback(async (content) => {
     const socket = getSocket()
@@ -216,6 +234,20 @@ export default function Room() {
       toast.error('Failed to send')
     }
   }, [id])
+
+  const loadOlderMessages = async () => {
+    if (loadingOlder || !messages.length) return
+    setLoadingOlder(true)
+    try {
+      const res = await messageAPI.get(id, { before: messages[0]._id })
+      setMessages((prev) => [...res.data.messages, ...prev])
+      setHasMoreMessages(res.data.hasMore)
+    } catch {
+      toast.error('Failed to load older messages')
+    } finally {
+      setLoadingOlder(false)
+    }
+  }
 
   const handleTyping = useCallback(() => {
     const socket = getSocket()
@@ -233,6 +265,18 @@ export default function Room() {
       const res = await doubtAPI.create(id, data)
       setDoubts((prev) => [res.data.doubt, ...prev])
       toast.success('Doubt asked! AI is thinking...')
+      const newDoubtId = res.data.doubt._id
+      let pollAttempts = 0
+      const pollDoubts = () => {
+        doubtAPI.get(id).then((r) => {
+          setDoubts(r.data.doubts)
+          const updated = r.data.doubts.find((d) => d._id === newDoubtId)
+          if (updated && updated.status !== 'open') return
+        }).catch(() => {})
+        pollAttempts++
+        if (pollAttempts < 6) setTimeout(pollDoubts, 5000)
+      }
+      setTimeout(pollDoubts, 6000)
     } catch {
       toast.error('Failed to submit doubt')
     }
@@ -256,6 +300,7 @@ export default function Room() {
     try {
       const res = await roomAPI.acceptRequest(id, userId)
       setRoom(res.data.room)
+      setPendingRequests(res.data.room.joinRequests?.filter((r) => r.status === 'pending') || [])
       toast.success('Request accepted')
     } catch (err) {
       toast.error(err.response?.data?.message || 'Failed to accept')
@@ -270,6 +315,26 @@ export default function Room() {
       toast.success(`${userName || 'Member'} removed`)
     } catch (err) {
       toast.error(err.response?.data?.message || 'Failed to kick')
+    }
+  }
+
+  const handleLeaveRoom = async () => {
+    try {
+      await roomAPI.leave(id)
+      toast.success('Left room')
+      navigate('/')
+    } catch {
+      toast.error('Failed to leave room')
+    }
+  }
+
+  const handleDeactivateRoom = async () => {
+    try {
+      await roomAPI.deactivate(id)
+      toast.success('Room deactivated')
+      navigate('/')
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to deactivate')
     }
   }
 
@@ -353,7 +418,39 @@ export default function Room() {
     }
   }
 
-  if (loading) return <div className="text-center py-20">Loading...</div>
+  if (loading) return (
+    <div className="flex gap-6 h-[calc(100vh-6rem)]">
+      <div className="flex-1 flex flex-col bg-white rounded-xl shadow-sm border">
+        <div className="border-b px-4 py-3">
+          <div className="flex gap-6">
+            <Skeleton height={32} width={80} />
+            <Skeleton height={32} width={80} />
+            <Skeleton height={32} width={80} />
+            <Skeleton height={32} width={120} />
+          </div>
+        </div>
+        <div className="flex-1 p-4 space-y-4">
+          <Skeleton height={60} />
+          <Skeleton height={60} />
+          <Skeleton height={60} />
+          <Skeleton height={60} />
+        </div>
+      </div>
+      <div className="w-80 space-y-4">
+        <div className="bg-white rounded-xl shadow-sm border p-4">
+          <Skeleton height={24} width="60%" className="mb-2" />
+          <Skeleton height={14} width={80} />
+        </div>
+        <div className="bg-white rounded-xl shadow-sm border p-4 space-y-3">
+          <Skeleton height={16} width={100} />
+          <Skeleton height={32} />
+        </div>
+        <div className="bg-white rounded-xl shadow-sm border p-4">
+          <Skeleton height={32} />
+        </div>
+      </div>
+    </div>
+  )
   if (!room) return null
 
   const isAdmin = room.members?.find((m) => m.user?._id === user?._id)?.role === 'admin'
@@ -401,6 +498,14 @@ export default function Room() {
                   {formatTime(sessionTimer)}
                 </span>
               )}
+              {isAdmin && (
+                <button
+                  onClick={() => setShowDeactivateConfirm(true)}
+                  className="text-xs px-2.5 py-1 bg-red-100 text-red-600 rounded hover:bg-red-200 font-medium"
+                >
+                  Deactivate
+                </button>
+              )}
               <span className="relative group">
                 <button
                   onClick={() => {
@@ -422,7 +527,12 @@ export default function Room() {
         <div className="flex-1 flex flex-col overflow-hidden">
           {activeTab === 'chat' && (
             <>
-              <MessageList messages={messages} />
+          <MessageList
+            messages={messages}
+            onLoadOlder={loadOlderMessages}
+            hasMore={hasMoreMessages}
+            loadingOlder={loadingOlder}
+          />
               <TypingIndicator users={typingUsers} />
               <MessageInput onSend={handleSendMessage} onTyping={handleTyping} />
             </>
@@ -568,7 +678,66 @@ export default function Room() {
         <div className="bg-white rounded-xl shadow-sm border p-4">
           <VideoCall roomId={id} roomName={room.name} isAdmin={isAdmin} onActiveChange={setVideoActive} />
         </div>
+
+        {!isAdmin && (
+          <button
+            onClick={() => setShowLeaveConfirm(true)}
+            className="w-full text-xs px-3 py-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 font-medium"
+          >
+            Leave Room
+          </button>
+        )}
       </div>
+
+      {showLeaveConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-sm mx-4">
+            <h3 className="text-lg font-bold text-gray-800 mb-2">Leave Room?</h3>
+            <p className="text-sm text-gray-500 mb-6">
+              Are you sure you want to leave <span className="font-medium text-gray-700">{room.name}</span>?
+            </p>
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => setShowLeaveConfirm(false)}
+                className="px-4 py-2 text-sm text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleLeaveRoom}
+                className="px-4 py-2 text-sm text-white bg-red-600 rounded-lg hover:bg-red-700"
+              >
+                Leave
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showDeactivateConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-sm mx-4">
+            <h3 className="text-lg font-bold text-gray-800 mb-2">Deactivate Room?</h3>
+            <p className="text-sm text-gray-500 mb-6">
+              This will delete all messages, doubts, flashcards, and session data for <span className="font-medium text-gray-700">{room.name}</span>. This cannot be undone.
+            </p>
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => setShowDeactivateConfirm(false)}
+                className="px-4 py-2 text-sm text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDeactivateRoom}
+                className="px-4 py-2 text-sm text-white bg-red-600 rounded-lg hover:bg-red-700"
+              >
+                Deactivate
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

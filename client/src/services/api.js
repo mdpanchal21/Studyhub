@@ -33,13 +33,15 @@ export const authAPI = {
 
 export const roomAPI = {
   create: (data) => api.post('/rooms', data),
-  getAll: () => api.get('/rooms'),
+  getAll: (params) => api.get('/rooms', { params }),
   getOne: (id) => api.get(`/rooms/${id}`),
   getByCode: (inviteCode) => api.get(`/rooms/by-code/${inviteCode}`),
+  getHistory: (params) => api.get('/rooms/history', { params }),
   join: (inviteCode) => api.post('/rooms/join', { inviteCode }),
   requestJoin: (inviteCode) => api.post('/rooms/request-join', { inviteCode }),
   leave: (id) => api.post(`/rooms/${id}/leave`),
   delete: (id) => api.delete(`/rooms/${id}`),
+  deactivate: (id) => api.post(`/rooms/${id}/deactivate`),
   getPendingRequests: (id) => api.get(`/rooms/${id}/requests`),
   acceptRequest: (id, userId) => api.post(`/rooms/${id}/requests/${userId}/accept`),
   declineRequest: (id, userId) => api.post(`/rooms/${id}/requests/${userId}/decline`),
@@ -47,7 +49,7 @@ export const roomAPI = {
 }
 
 export const messageAPI = {
-  get: (roomId) => api.get(`/messages/${roomId}`),
+  get: (roomId, params) => api.get(`/messages/${roomId}`, { params }),
   send: (roomId, data) => api.post(`/messages/${roomId}`, data),
   delete: (roomId, id) => api.delete(`/messages/${roomId}/${id}`),
 }

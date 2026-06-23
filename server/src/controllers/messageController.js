@@ -2,11 +2,24 @@ import Message from '../models/Message.js'
 
 export const getMessages = async (req, res) => {
   try {
-    const messages = await Message.find({ room: req.params.roomId })
+    const limit = Math.min(parseInt(req.query.limit) || 50, 100)
+    const filter = { room: req.params.roomId }
+
+    if (req.query.before) {
+      filter._id = { $lt: req.query.before }
+    }
+
+    const raw = await Message.find(filter)
       .populate('sender', 'name email avatar')
-      .sort({ createdAt: -1 })
-      .limit(100)
-    res.json({ messages: messages.reverse() })
+      .sort({ _id: -1 })
+      .limit(limit + 1)
+
+    const hasMore = raw.length > limit
+    if (hasMore) raw.pop()
+
+    const messages = raw.reverse()
+
+    res.json({ messages, hasMore })
   } catch (error) {
     res.status(500).json({ message: error.message })
   }

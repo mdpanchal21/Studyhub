@@ -49,6 +49,10 @@ const reattachAllDispatchers = () => {
 export const connectSocket = (token) => {
   if (socket) {
     if (socket.connected) return socket
+    // Prevent calling connect() if the socket is already actively connecting.
+    // socket.active is true if it's connected or connecting.
+    if (socket.active) return socket
+
     // Socket exists but disconnected — update auth token and reconnect
     socket.auth = { token }
     socket.connect()
