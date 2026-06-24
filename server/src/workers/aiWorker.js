@@ -1,4 +1,4 @@
-import { getAIResponse } from '../config/ai.js'
+import { getAIResponse, getAIResponseStream } from '../config/ai.js'
 import Doubt from '../models/Doubt.js'
 import Flashcard from '../models/Flashcard.js'
 import { popAIJob } from '../queues/aiQueue.js'
@@ -9,37 +9,70 @@ const processAIJob = async (data) => {
   if (data.type === 'flashcard') {
     const { userId, roomId, topic } = data
     const prompt = `Generate 10 flashcards about "${topic}" in JSON format [{"question": "...", "answer": "..."}]`
-    const result = await getAIResponse(prompt)
+    const io = getIO()
+
     try {
+      const result = await getAIResponseStream(prompt, (chunk) => {
+        if (io && userId) {
+          io.to(userId.toString()).emit('flashcard-ai-chunk', { chunk, topic })
+        }
+      })
+
       const jsonStr = result.text.replace(/```json|```/g, '').trim()
       const cards = JSON.parse(jsonStr)
+      const created = []
       for (const card of cards) {
-        await Flashcard.create({ user: userId, room: roomId, question: card.question, answer: card.answer })
+        const doc = await Flashcard.create({ user: userId, room: roomId, question: card.question, answer: card.answer })
+        created.push(doc)
       }
       console.log(`Generated ${cards.length} flashcards for: ${topic}`)
+      if (io && userId) {
+        io.to(userId.toString()).emit('flashcard-ai-complete', { flashcards: created, topic })
+      }
     } catch (err) {
-      console.error('Flashcard parse error:', err.message)
+      console.error('Flashcard generation error:', err.message)
+      if (io && userId) {
+        io.to(userId.toString()).emit('flashcard-ai-error', { error: 'Failed to generate flashcards. Try again.' })
+      }
     }
     return
   }
 
   const { doubtId, title, description } = data
   if (doubtId) {
-    const prompt = `Answer this doubt in detail:\nTitle: ${title}\nDescription: ${description}`
-    const result = await getAIResponse(prompt)
-    const doubt = await Doubt.findByIdAndUpdate(
-      doubtId,
-      { aiAnswer: result.text, status: 'ai_answered' },
-      { new: true }
-    )
-    console.log(`AI answered doubt: ${doubtId}`)
     const io = getIO()
-    if (io && doubt) {
-      io.to(doubt.room.toString()).emit('doubt-update', {
-        doubtId: doubt._id,
-        status: 'ai_answered',
-        aiAnswer: result.text,
+    const doubt = await Doubt.findById(doubtId)
+    if (!doubt) return
+
+    const roomId = doubt.room.toString()
+    const prompt = `Answer this doubt in detail:\nTitle: ${title}\nDescription: ${description}`
+
+    try {
+      const result = await getAIResponseStream(prompt, (chunk) => {
+        if (io) {
+          io.to(roomId).emit('doubt-ai-chunk', { doubtId, chunk })
+        }
       })
+
+      await Doubt.findByIdAndUpdate(
+        doubtId,
+        { aiAnswer: result.text, status: 'ai_answered' },
+        { new: true }
+      )
+      console.log(`AI answered doubt: ${doubtId}`)
+
+      if (io) {
+        io.to(roomId).emit('doubt-ai-complete', {
+          doubtId,
+          status: 'ai_answered',
+          aiAnswer: result.text,
+        })
+      }
+    } catch (err) {
+      console.error('AI answer error for doubt', doubtId, ':', err.message)
+      if (io) {
+        io.to(roomId).emit('doubt-ai-error', { doubtId })
+      }
     }
   }
 }

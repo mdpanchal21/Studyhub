@@ -21,3 +21,23 @@ export const getAIResponse = async (prompt) => {
     return { text: 'Sorry, AI service is unavailable right now.' }
   }
 }
+
+export const getAIResponseStream = async (prompt, onChunk) => {
+  if (!genAI) {
+    throw new Error('AI not configured. Set GEMINI_API_KEY in .env')
+  }
+  try {
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' })
+    const result = await model.generateContentStream(prompt)
+    let fullText = ''
+    for await (const chunk of result.stream) {
+      const text = chunk.text()
+      fullText += text
+      onChunk?.(text)
+    }
+    return { text: fullText }
+  } catch (error) {
+    console.error('AI stream error:', error.message)
+    throw error
+  }
+}

@@ -42,6 +42,8 @@ export default function Room() {
   const [showDeactivateConfirm, setShowDeactivateConfirm] = useState(false)
   const [hasMoreMessages, setHasMoreMessages] = useState(false)
   const [loadingOlder, setLoadingOlder] = useState(false)
+  const [generatingFlashcards, setGeneratingFlashcards] = useState(false)
+  const [flashcardStream, setFlashcardStream] = useState('')
 
   useEffect(() => {
     roomAPI.getOne(id)
@@ -213,6 +215,39 @@ export default function Room() {
           d._id === doubtId ? { ...d, status, ...(aiAnswer ? { aiAnswer } : {}) } : d
         ))
       }),
+      onSocketEvent('doubt-ai-chunk', ({ doubtId, chunk }) => {
+        setDoubts((prev) => prev.map((d) =>
+          d._id === doubtId ? { ...d, aiAnswer: (d.aiAnswer || '') + chunk } : d
+        ))
+      }),
+      onSocketEvent('doubt-ai-complete', ({ doubtId, status, aiAnswer }) => {
+        console.log('[Socket] doubt-ai-complete received:', doubtId)
+        setDoubts((prev) => prev.map((d) =>
+          d._id === doubtId ? { ...d, status, aiAnswer } : d
+        ))
+      }),
+      onSocketEvent('doubt-ai-error', ({ doubtId }) => {
+        console.log('[Socket] doubt-ai-error received:', doubtId)
+        toast.error('AI service is unavailable. Please try again.')
+      }),
+      onSocketEvent('flashcard-ai-chunk', ({ chunk, topic }) => {
+        setFlashcardStream((prev) => prev + chunk)
+      }),
+      onSocketEvent('flashcard-ai-complete', ({ flashcards: newCards, topic }) => {
+        setFlashcards((prev) => {
+          const existingIds = new Set(prev.map((c) => c._id))
+          const unique = newCards.filter((c) => !existingIds.has(c._id))
+          return [...unique, ...prev]
+        })
+        setGeneratingFlashcards(false)
+        setFlashcardStream('')
+        toast.success(`Generated ${newCards.length} flashcards about ${topic}`)
+      }),
+      onSocketEvent('flashcard-ai-error', ({ error }) => {
+        setGeneratingFlashcards(false)
+        setFlashcardStream('')
+        toast.error(error)
+      }),
       onSocketEvent('room-deactivated', ({ roomName }) => {
         toast(`${roomName || 'Room'} was deactivated by the admin`, { icon: '🚫' })
         navigate('/')
@@ -265,18 +300,6 @@ export default function Room() {
       const res = await doubtAPI.create(id, data)
       setDoubts((prev) => [res.data.doubt, ...prev])
       toast.success('Doubt asked! AI is thinking...')
-      const newDoubtId = res.data.doubt._id
-      let pollAttempts = 0
-      const pollDoubts = () => {
-        doubtAPI.get(id).then((r) => {
-          setDoubts(r.data.doubts)
-          const updated = r.data.doubts.find((d) => d._id === newDoubtId)
-          if (updated && updated.status !== 'open') return
-        }).catch(() => {})
-        pollAttempts++
-        if (pollAttempts < 6) setTimeout(pollDoubts, 5000)
-      }
-      setTimeout(pollDoubts, 6000)
     } catch {
       toast.error('Failed to submit doubt')
     }
@@ -420,7 +443,7 @@ export default function Room() {
 
   if (loading) return (
     <div className="flex gap-6 h-[calc(100vh-6rem)]">
-      <div className="flex-1 flex flex-col bg-white rounded-xl shadow-sm border">
+      <div className="flex-1 min-w-0 flex flex-col bg-white rounded-xl shadow-sm border">
         <div className="border-b px-4 py-3">
           <div className="flex gap-6">
             <Skeleton height={32} width={80} />
@@ -468,7 +491,7 @@ export default function Room() {
 
   return (
     <div className="flex gap-6 h-[calc(100vh-6rem)]">
-      <div className="flex-1 flex flex-col bg-white rounded-xl shadow-sm border">
+      <div className="flex-1 min-w-0 flex flex-col bg-white rounded-xl shadow-sm border">
         <div className="border-b px-4">
           <div className="flex items-center justify-between">
             <div className="flex gap-6">
@@ -551,22 +574,53 @@ export default function Room() {
                   placeholder="Generate flashcards for a topic..."
                   className="flex-1 px-3 py-2 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-400"
                   id="flashcardTopic"
+                  disabled={generatingFlashcards}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !generatingFlashcards) {
+                      document.getElementById('flashcardGenerateBtn')?.click()
+                    }
+                  }}
                 />
                 <button
+                  id="flashcardGenerateBtn"
+                  disabled={generatingFlashcards}
                   onClick={async () => {
                     const input = document.getElementById('flashcardTopic')
                     if (!input.value.trim()) return toast.error('Enter a topic')
+                    setGeneratingFlashcards(true)
+                    setFlashcardStream('')
                     try {
                       await flashcardAPI.generate(id, input.value.trim())
-                      toast.success('Generating flashcards... check back soon')
                       input.value = ''
-                    } catch { toast.error('Generation failed') }
+                    } catch {
+                      setGeneratingFlashcards(false)
+                      setFlashcardStream('')
+                      toast.error('Generation failed')
+                    }
                   }}
-                  className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm hover:bg-indigo-700"
+                  className={`px-4 py-2 rounded-lg text-sm flex items-center gap-2 ${
+                    generatingFlashcards
+                      ? 'bg-indigo-400 text-white cursor-not-allowed'
+                      : 'bg-indigo-600 text-white hover:bg-indigo-700'
+                  }`}
                 >
-                  AI Generate
+                  {generatingFlashcards && (
+                    <span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  )}
+                  {generatingFlashcards ? 'Generating...' : 'AI Generate'}
                 </button>
               </div>
+              {generatingFlashcards && flashcardStream && (
+                <div className="bg-gray-50 border border-dashed border-gray-200 rounded-lg p-3">
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="w-2 h-2 bg-indigo-400 rounded-full animate-pulse" />
+                    <p className="text-xs text-indigo-500 font-medium">AI is generating flashcards...</p>
+                  </div>
+                  <pre className="text-xs text-gray-500 whitespace-pre-wrap max-h-32 overflow-y-auto">
+                    {flashcardStream}
+                  </pre>
+                </div>
+              )}
               <FlashcardList flashcards={flashcards} onDelete={handleDeleteFlashcard} />
             </div>
           )}

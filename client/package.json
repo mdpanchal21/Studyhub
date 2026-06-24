@@ -10,13 +10,17 @@
   },
   "dependencies": {
     "@digitalsamba/embedded-sdk": "^0.0.55",
+    "@tailwindcss/typography": "^0.5.20",
     "axios": "^1.6.2",
     "date-fns": "^3.0.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-hot-toast": "^2.4.1",
     "react-loading-skeleton": "^3.5.0",
+    "react-markdown": "^10.1.0",
     "react-router-dom": "^6.20.0",
+    "rehype-highlight": "^7.0.2",
+    "remark-gfm": "^4.0.1",
     "socket.io-client": "^4.7.2"
   },
   "devDependencies": {

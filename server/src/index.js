@@ -9,6 +9,14 @@ import { startEmailWorker } from './workers/emailWorker.js'
 
 const PORT = process.env.PORT || 5000
 
+process.on('unhandledRejection', (reason) => {
+  console.error('Unhandled Rejection:', reason)
+})
+
+process.on('uncaughtException', (err) => {
+  console.error('Uncaught Exception:', err)
+})
+
 const server = http.createServer(app)
 
 setupSocket(server, app)
