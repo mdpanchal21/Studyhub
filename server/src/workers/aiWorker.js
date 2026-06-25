@@ -70,8 +70,20 @@ const processAIJob = async (data) => {
       }
     } catch (err) {
       console.error('AI answer error for doubt', doubtId, ':', err.message)
+
+      await Doubt.findByIdAndUpdate(
+        doubtId,
+        {
+          aiAnswer: 'Sorry, AI service is unavailable right now. Please try again.',
+          status: 'failed',
+        }
+      )
+
       if (io) {
-        io.to(roomId).emit('doubt-ai-error', { doubtId })
+        io.to(roomId).emit('doubt-ai-error', {
+          doubtId,
+          message: 'Sorry, AI service is unavailable right now. Please try again.',
+        })
       }
     }
   }

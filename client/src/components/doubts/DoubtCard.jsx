@@ -1,27 +1,80 @@
+import { useState } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import rehypeHighlight from 'rehype-highlight'
 import 'highlight.js/styles/github.css'
 
-export default function DoubtCard({ doubt, onResolve }) {
+export default function DoubtCard({ doubt, onResolve, onRetry }) {
+  const [collapsed, setCollapsed] = useState(true)
   return (
     <div className="bg-white border rounded-xl p-4">
       <div className="flex items-start justify-between">
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2">
-            <h4 className="font-semibold text-sm">{doubt.title}</h4>
-            <span className={`text-xs px-2 py-0.5 rounded ${
-              doubt.status === 'resolved' ? 'bg-green-100 text-green-700' :
-              doubt.status === 'ai_answered' ? 'bg-yellow-100 text-yellow-700' :
-              'bg-gray-100 text-gray-600'
-            }`}>
-              {doubt.status.replace('_', ' ')}
+        <button
+          onClick={() => setCollapsed(c => !c)}
+          className="flex items-center gap-2 flex-1 min-w-0 text-left group"
+        >
+          <svg
+            className={`w-4 h-4 text-gray-400 transition-transform duration-200 shrink-0 ${collapsed ? '' : 'rotate-90'}`}
+            fill="none" stroke="currentColor" viewBox="0 0 24 24"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+          </svg>
+          <h4 className="font-semibold text-sm truncate">{doubt.title}</h4>
+          <span className={`text-xs px-2 py-0.5 rounded whitespace-nowrap ${
+            doubt.status === 'resolved' ? 'bg-green-100 text-green-700' :
+            doubt.status === 'ai_answered' ? 'bg-yellow-100 text-yellow-700' :
+            doubt.status === 'failed' ? 'bg-red-100 text-red-700' :
+            'bg-gray-100 text-gray-600'
+          }`}>
+            {doubt.status.replace('_', ' ')}
+          </span>
+        </button>
+        <div className="flex items-center gap-2 ml-2 shrink-0">
+          {doubt.status === 'failed' && (
+            <span className="relative group">
+              <button
+                onClick={() => (doubt.retryCount ?? 0) < 3 ? onRetry?.(doubt._id) : null}
+                disabled={(doubt.retryCount ?? 0) >= 3}
+                className={`text-xs font-medium transition ${
+                  (doubt.retryCount ?? 0) < 3
+                    ? 'text-indigo-600 hover:text-indigo-800'
+                    : 'text-gray-400 cursor-not-allowed opacity-50'
+                }`}
+              >
+                Retry
+              </button>
+              {(doubt.retryCount ?? 0) >= 3 && (
+                <span className="absolute -top-8 left-1/2 -translate-x-1/2 bg-gray-800 text-white text-[10px] px-2 py-1 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition pointer-events-none">
+                  Retry attempts completed (max 3)
+                </span>
+              )}
             </span>
-          </div>
-          <p className="text-sm text-gray-600 mt-1">{doubt.description}</p>
+          )}
+          {doubt.status !== 'resolved' && (
+            <button
+              onClick={() => onResolve?.(doubt._id)}
+              className="text-xs text-green-600 hover:text-green-800 whitespace-nowrap"
+            >
+              Resolve
+            </button>
+          )}
+        </div>
+      </div>
+
+      <div className={`grid transition-all duration-200 ${collapsed ? 'grid-rows-[0fr]' : 'grid-rows-[1fr]'}`}>
+        <div className="overflow-hidden min-w-0">
+          <p className="text-sm text-gray-600 mt-3">{doubt.description}</p>
           {doubt.aiAnswer ? (
-            <div className="mt-3 bg-indigo-50 rounded-lg p-3">
-              <p className="text-xs font-semibold text-indigo-600 mb-1">AI Answer</p>
+            <div className={`mt-3 rounded-lg p-3 ${
+              doubt.status === 'failed'
+                ? 'bg-red-50 border border-red-200'
+                : 'bg-indigo-50'
+            }`}>
+              <p className={`text-xs font-semibold mb-1 ${
+                doubt.status === 'failed' ? 'text-red-600' : 'text-indigo-600'
+              }`}>
+                {doubt.status === 'failed' ? 'AI Error' : 'AI Answer'}
+              </p>
               <div className="text-sm text-gray-700 leading-relaxed break-words">
                 <ReactMarkdown
                   remarkPlugins={[remarkGfm]}
@@ -115,19 +168,11 @@ export default function DoubtCard({ doubt, onResolve }) {
               </div>
             </div>
           ) : null}
+          <p className="text-xs text-gray-400 mt-3">
+            Asked by {doubt.user?.name} · {new Date(doubt.createdAt).toLocaleDateString()}
+          </p>
         </div>
-        {doubt.status !== 'resolved' && (
-          <button
-            onClick={() => onResolve?.(doubt._id)}
-            className="text-xs text-green-600 hover:text-green-800 ml-2 whitespace-nowrap shrink-0"
-          >
-            Resolve
-          </button>
-        )}
       </div>
-      <p className="text-xs text-gray-400 mt-2">
-        Asked by {doubt.user?.name} · {new Date(doubt.createdAt).toLocaleDateString()}
-      </p>
     </div>
   )
 }

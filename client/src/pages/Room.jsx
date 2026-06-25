@@ -31,6 +31,16 @@ export default function Room() {
   const [activeTab, setActiveTab] = useState('chat')
   const [messages, setMessages] = useState([])
   const [doubts, setDoubts] = useState([])
+  const DOUBTS_PER_PAGE = 10
+  const [currentPage, setCurrentPage] = useState(1)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [searchInput, setSearchInput] = useState('')
+  const [statusFilter, setStatusFilter] = useState('')
+  const [userFilter, setUserFilter] = useState('')
+  const [totalPages, setTotalPages] = useState(1)
+  const [totalDoubts, setTotalDoubts] = useState(0)
+  const [loadingDoubts, setLoadingDoubts] = useState(false)
+  const [doubtsRefreshKey, setDoubtsRefreshKey] = useState(0)
   const [flashcards, setFlashcards] = useState([])
   const [typingUsers, setTypingUsers] = useState([])
   const [roomSession, setRoomSession] = useState(null)
@@ -60,15 +70,40 @@ export default function Room() {
       setMessages(res.data.messages)
       setHasMoreMessages(res.data.hasMore)
     }).catch(() => {})
-    doubtAPI.get(id).then((res) => setDoubts(res.data.doubts)).catch(() => {})
     flashcardAPI.get(id).then((res) => setFlashcards(res.data.flashcards)).catch(() => {})
     roomSessionAPI.getActive(id).then((res) => setRoomSession(res.data.session)).catch(() => {})
   }, [id])
 
   useEffect(() => { fetchData() }, [fetchData])
 
+  // Debounce search input → update searchQuery + reset to page 1
   useEffect(() => {
-    const onFocus = () => { if (document.visibilityState === 'visible') fetchData() }
+    const timer = setTimeout(() => {
+      setSearchQuery(searchInput)
+      setCurrentPage(1)
+    }, 400)
+    return () => clearTimeout(timer)
+  }, [searchInput])
+
+  // Fetch doubts with pagination/search/filter
+  useEffect(() => {
+    setLoadingDoubts(true)
+    doubtAPI.get(id, {
+      page: currentPage,
+      limit: DOUBTS_PER_PAGE,
+      search: searchQuery || undefined,
+      status: statusFilter || undefined,
+      userId: userFilter || undefined,
+    }).then((res) => {
+      setDoubts(res.data.doubts)
+      setTotalPages(res.data.pagination.pages)
+      setTotalDoubts(res.data.pagination.total)
+    }).catch(() => setDoubts([]))
+      .finally(() => setLoadingDoubts(false))
+  }, [id, currentPage, searchQuery, statusFilter, userFilter, doubtsRefreshKey])
+
+  useEffect(() => {
+    const onFocus = () => { if (document.visibilityState === 'visible') { fetchData(); setDoubtsRefreshKey(k => k + 1) } }
     document.addEventListener('visibilitychange', onFocus)
     return () => document.removeEventListener('visibilitychange', onFocus)
   }, [fetchData])
@@ -129,6 +164,7 @@ export default function Room() {
     const unsubReconnect = onReconnect(() => {
       socket.emit('join-room', id)
       fetchData()
+      setDoubtsRefreshKey(k => k + 1)
     })
 
     return () => {
@@ -226,8 +262,11 @@ export default function Room() {
           d._id === doubtId ? { ...d, status, aiAnswer } : d
         ))
       }),
-      onSocketEvent('doubt-ai-error', ({ doubtId }) => {
+      onSocketEvent('doubt-ai-error', ({ doubtId, message }) => {
         console.log('[Socket] doubt-ai-error received:', doubtId)
+        setDoubts((prev) => prev.map((d) =>
+          d._id === doubtId ? { ...d, status: 'failed', aiAnswer: message || 'Sorry, AI service is unavailable right now. Please try again.' } : d
+        ))
         toast.error('AI service is unavailable. Please try again.')
       }),
       onSocketEvent('flashcard-ai-chunk', ({ chunk, topic }) => {
@@ -298,7 +337,15 @@ export default function Room() {
   const handleDoubtSubmit = async (data) => {
     try {
       const res = await doubtAPI.create(id, data)
-      setDoubts((prev) => [res.data.doubt, ...prev])
+      if (currentPage === 1 && !searchQuery && !statusFilter && !userFilter) {
+        setDoubts((prev) => [res.data.doubt, ...prev])
+      } else {
+        setCurrentPage(1)
+        setSearchInput('')
+        setSearchQuery('')
+        setStatusFilter('')
+        setUserFilter('')
+      }
       toast.success('Doubt asked! AI is thinking...')
     } catch {
       toast.error('Failed to submit doubt')
@@ -317,6 +364,38 @@ export default function Room() {
     } catch {
       toast.error('Failed to resolve')
     }
+  }
+
+  const handleRetryDoubt = async (doubtId) => {
+    try {
+      const res = await doubtAPI.retry(doubtId)
+      setDoubts((prev) => prev.map((d) =>
+        d._id === doubtId ? { ...d, status: 'open', aiAnswer: null, retryCount: res.data.doubt.retryCount } : d
+      ))
+      toast.success('Retrying...')
+    } catch (err) {
+      const msg = err.response?.data?.message || 'Failed to retry'
+      toast.error(msg)
+    }
+  }
+
+  const handlePageChange = (page) => {
+    if (page < 1 || page > totalPages) return
+    setCurrentPage(page)
+  }
+
+  const handleSearchChange = (value) => {
+    setSearchInput(value)
+  }
+
+  const handleStatusFilterChange = (value) => {
+    setStatusFilter(value)
+    setCurrentPage(1)
+  }
+
+  const handleUserFilterChange = (value) => {
+    setUserFilter(value)
+    setCurrentPage(1)
   }
 
   const handleAcceptRequest = async (userId) => {
@@ -563,7 +642,24 @@ export default function Room() {
           {activeTab === 'doubts' && (
             <div className="flex-1 overflow-y-auto p-4 space-y-4">
               <DoubtForm onSubmit={handleDoubtSubmit} />
-              <DoubtList doubts={doubts} onResolve={handleResolveDoubt} />
+              <DoubtList
+                doubts={doubts}
+                onResolve={handleResolveDoubt}
+                onRetry={handleRetryDoubt}
+                currentPage={currentPage}
+                totalPages={totalPages}
+                total={totalDoubts}
+                onPageChange={handlePageChange}
+                search={searchInput}
+                onSearchChange={handleSearchChange}
+                statusFilter={statusFilter}
+                onStatusFilterChange={handleStatusFilterChange}
+                userFilter={userFilter}
+                onUserFilterChange={handleUserFilterChange}
+                members={room?.members || []}
+                currentUserId={user?._id}
+                loading={loadingDoubts}
+              />
             </div>
           )}
           {activeTab === 'flashcards' && (

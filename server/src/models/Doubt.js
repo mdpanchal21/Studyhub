@@ -5,8 +5,9 @@ const doubtSchema = new mongoose.Schema({
   user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   title: { type: String, required: true },
   description: { type: String, required: true },
-  status: { type: String, enum: ['open', 'ai_answered', 'resolved'], default: 'open' },
+  status: { type: String, enum: ['open', 'ai_answered', 'failed', 'resolved'], default: 'open' },
   aiAnswer: { type: String },
+  retryCount: { type: Number, default: 0 },
   resolvedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
 }, { timestamps: true })
 

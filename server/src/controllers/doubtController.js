@@ -21,11 +21,41 @@ export const createDoubt = async (req, res) => {
 
 export const getDoubts = async (req, res) => {
   try {
-    const doubts = await Doubt.find({ room: req.params.roomId })
+    const { page = 1, limit = 10, search, status, userId } = req.query
+    const query = { room: req.params.roomId }
+
+    if (search) {
+      query.$or = [
+        { title: { $regex: search, $options: 'i' } },
+        { description: { $regex: search, $options: 'i' } },
+      ]
+    }
+
+    if (status) {
+      query.status = status
+    }
+
+    if (userId) {
+      query.user = userId
+    }
+
+    const skip = (Math.max(1, parseInt(page)) - 1) * parseInt(limit)
+    const total = await Doubt.countDocuments(query)
+    const doubts = await Doubt.find(query)
       .populate('user', 'name email avatar')
       .sort({ createdAt: -1 })
-      .limit(50)
-    res.json({ doubts })
+      .skip(skip)
+      .limit(Math.max(1, parseInt(limit)))
+
+    res.json({
+      doubts,
+      pagination: {
+        page: Math.max(1, parseInt(page)),
+        limit: Math.max(1, parseInt(limit)),
+        total,
+        pages: Math.ceil(total / Math.max(1, parseInt(limit))),
+      },
+    })
   } catch (error) {
     res.status(500).json({ message: error.message })
   }
@@ -41,6 +71,27 @@ export const resolveDoubt = async (req, res) => {
     if (!doubt) {
       return res.status(404).json({ message: 'Doubt not found' })
     }
+    res.json({ doubt })
+  } catch (error) {
+    res.status(500).json({ message: error.message })
+  }
+}
+
+export const retryDoubt = async (req, res) => {
+  try {
+    const doubt = await Doubt.findById(req.params.id)
+    if (!doubt) {
+      return res.status(404).json({ message: 'Doubt not found' })
+    }
+    const currentRetries = doubt.retryCount ?? 0
+    if (currentRetries >= 3) {
+      return res.status(400).json({ message: 'Max retries reached. Please create a new doubt.' })
+    }
+    doubt.status = 'open'
+    doubt.aiAnswer = undefined
+    doubt.retryCount = currentRetries + 1
+    await doubt.save()
+    await addAIJob({ doubtId: doubt._id, title: doubt.title, description: doubt.description })
     res.json({ doubt })
   } catch (error) {
     res.status(500).json({ message: error.message })

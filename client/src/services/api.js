@@ -55,9 +55,10 @@ export const messageAPI = {
 }
 
 export const doubtAPI = {
-  get: (roomId) => api.get(`/doubts/${roomId}`),
+  get: (roomId, params) => api.get(`/doubts/${roomId}`, { params }),
   create: (roomId, data) => api.post(`/doubts/${roomId}`, data),
   resolve: (id) => api.patch(`/doubts/${id}/resolve`),
+  retry: (id) => api.post(`/doubts/${id}/retry`),
 }
 
 export const flashcardAPI = {
