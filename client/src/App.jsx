@@ -4,6 +4,7 @@ import Navbar from './components/common/Navbar'
 import Auth from './pages/Auth'
 import Dashboard from './pages/Dashboard'
 import Room from './pages/Room'
+import Roadmap from './pages/Roadmap'
 import Flashcards from './pages/Flashcards'
 import Profile from './pages/Profile'
 import JoinByLink from './pages/JoinByLink'
@@ -21,12 +22,13 @@ export default function App() {
   const { user } = useAuth()
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="app-shell">
       {user && <Navbar />}
       <main className={user ? 'max-w-7xl mx-auto px-4 py-6' : ''}>
         <Routes>
           <Route path="/auth" element={user ? <Navigate to="/" /> : <Auth />} />
           <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+          <Route path="/roadmap" element={<ProtectedRoute><Roadmap /></ProtectedRoute>} />
           <Route path="/room/:id" element={<ProtectedRoute><Room /></ProtectedRoute>} />
           <Route path="/join/:inviteCode" element={<JoinByLink />} />
           <Route path="/flashcards" element={<ProtectedRoute><Flashcards /></ProtectedRoute>} />

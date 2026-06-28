@@ -2,6 +2,185 @@
 @tailwind components;
 @tailwind utilities;
 
-body {
-  @apply bg-gray-50 text-gray-900;
+@layer base {
+  :root {
+    --app-bg: 7 10 18;
+    --app-bg-2: 11 16 26;
+    --app-surface: 16 22 34;
+    --app-surface-2: 22 29 45;
+    --app-border: 255 255 255;
+    --app-text: 240 246 255;
+    --app-muted: 148 163 184;
+    --app-accent: 45 212 191;
+    --app-accent-strong: 20 184 166;
+    --app-accent-soft: 13 148 136;
+    --app-warm: 245 158 11;
+    --app-danger: 251 113 133;
+  }
+
+  html {
+    color-scheme: dark;
+  }
+
+  body {
+    @apply min-h-screen text-slate-100 antialiased;
+    background:
+      radial-gradient(circle at top, rgba(45, 212, 191, 0.16), transparent 26%),
+      radial-gradient(circle at 85% 12%, rgba(245, 158, 11, 0.10), transparent 20%),
+      linear-gradient(180deg, rgb(var(--app-bg)) 0%, rgb(var(--app-bg-2)) 100%);
+  }
+
+  #root {
+    min-height: 100vh;
+  }
+
+  ::selection {
+    background: rgba(45, 212, 191, 0.28);
+    color: rgb(var(--app-text));
+  }
+}
+
+@layer components {
+  .app-shell {
+    @apply min-h-screen text-slate-100;
+  }
+
+  .app-shell .bg-white,
+  .app-shell .bg-gray-50,
+  .app-shell .bg-gray-100,
+  .app-shell .bg-indigo-50,
+  .app-shell .bg-purple-50,
+  .app-shell .bg-green-50,
+  .app-shell .bg-red-50,
+  .app-shell .bg-yellow-50 {
+    background-color: rgb(var(--app-surface)) !important;
+  }
+
+  .app-shell .bg-gray-200,
+  .app-shell .bg-indigo-100,
+  .app-shell .bg-purple-100,
+  .app-shell .bg-green-100,
+  .app-shell .bg-red-100,
+  .app-shell .bg-yellow-100 {
+    background-color: rgb(var(--app-surface-2)) !important;
+  }
+
+  .app-shell .text-gray-400,
+  .app-shell .text-gray-500,
+  .app-shell .text-gray-600,
+  .app-shell .text-slate-400,
+  .app-shell .text-slate-500,
+  .app-shell .text-slate-600 {
+    color: rgb(var(--app-muted)) !important;
+  }
+
+  .app-shell .text-gray-700,
+  .app-shell .text-gray-800,
+  .app-shell .text-gray-900,
+  .app-shell .text-slate-700,
+  .app-shell .text-slate-800,
+  .app-shell .text-slate-900 {
+    color: rgb(var(--app-text)) !important;
+  }
+
+  .app-shell [class~="border"],
+  .app-shell .border-gray-100,
+  .app-shell .border-gray-200,
+  .app-shell .border-gray-300,
+  .app-shell .border-indigo-100,
+  .app-shell .border-indigo-200,
+  .app-shell .border-purple-100,
+  .app-shell .border-green-100,
+  .app-shell .border-red-100,
+  .app-shell .border-yellow-100 {
+    border-color: rgba(255, 255, 255, 0.1) !important;
+  }
+
+  .app-shell .shadow-sm {
+    box-shadow: 0 12px 30px rgba(2, 6, 23, 0.22) !important;
+  }
+
+  .app-shell .shadow,
+  .app-shell .shadow-md,
+  .app-shell .shadow-lg,
+  .app-shell .shadow-xl {
+    box-shadow: 0 20px 60px rgba(2, 6, 23, 0.34) !important;
+  }
+
+  .app-shell .bg-indigo-600,
+  .app-shell .bg-indigo-700,
+  .app-shell .bg-purple-600,
+  .app-shell .bg-purple-700 {
+    background-color: rgb(var(--app-accent)) !important;
+    color: rgb(var(--app-bg)) !important;
+  }
+
+  .app-shell .hover\:bg-indigo-700:hover,
+  .app-shell .hover\:bg-purple-700:hover {
+    background-color: rgb(var(--app-accent-strong)) !important;
+  }
+
+  .app-shell .text-indigo-600,
+  .app-shell .text-indigo-700,
+  .app-shell .text-purple-600,
+  .app-shell .text-purple-700 {
+    color: rgb(var(--app-accent)) !important;
+  }
+
+  .app-shell .hover\:text-indigo-600:hover,
+  .app-shell .hover\:text-indigo-700:hover,
+  .app-shell .hover\:text-purple-600:hover {
+    color: rgb(var(--app-accent)) !important;
+  }
+
+  .app-shell input,
+  .app-shell select,
+  .app-shell textarea {
+    @apply rounded-xl border border-white/10 bg-white/5 text-slate-100 outline-none transition;
+    caret-color: rgb(var(--app-accent));
+  }
+
+  .app-shell input::placeholder,
+  .app-shell textarea::placeholder {
+    color: rgb(var(--app-muted));
+  }
+
+  .app-shell input:focus,
+  .app-shell select:focus,
+  .app-shell textarea:focus {
+    @apply border-teal-400/60 ring-2 ring-teal-500/20;
+  }
+
+  .surface {
+    @apply bg-slate-900/70 backdrop-blur-xl border border-white/10 shadow-2xl shadow-slate-950/40;
+  }
+
+  .surface-soft {
+    @apply bg-white/5 backdrop-blur-md border border-white/10;
+  }
+
+  .input-base {
+    @apply w-full rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-slate-100 outline-none transition focus:border-teal-400/60 focus:ring-2 focus:ring-teal-500/20;
+    caret-color: rgb(var(--app-accent));
+  }
+
+  .input-base::placeholder {
+    color: rgb(var(--app-muted));
+  }
+
+  .button-primary {
+    @apply inline-flex items-center justify-center rounded-xl bg-teal-500 px-4 py-2.5 text-sm font-semibold text-slate-950 transition hover:bg-teal-400 disabled:cursor-not-allowed disabled:opacity-50;
+  }
+
+  .button-secondary {
+    @apply inline-flex items-center justify-center rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm font-semibold text-slate-100 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50;
+  }
+
+  .badge-soft {
+    @apply inline-flex items-center rounded-full border border-teal-400/20 bg-teal-400/10 px-2.5 py-1 text-xs font-medium text-teal-300;
+  }
+
+  .section-label {
+    @apply text-xs font-semibold uppercase tracking-[0.24em] text-teal-300;
+  }
 }

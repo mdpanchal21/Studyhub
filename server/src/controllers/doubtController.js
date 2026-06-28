@@ -79,7 +79,7 @@ export const resolveDoubt = async (req, res) => {
 
 export const retryDoubt = async (req, res) => {
   try {
-    const doubt = await Doubt.findById(req.params.id)
+    const doubt = req.doubt || await Doubt.findById(req.params.id)
     if (!doubt) {
       return res.status(404).json({ message: 'Doubt not found' })
     }

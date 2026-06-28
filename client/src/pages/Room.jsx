@@ -61,7 +61,12 @@ export default function Room() {
         setRoom(res.data.room)
         setPendingRequests(res.data.room.joinRequests?.filter((r) => r.status === 'pending') || [])
       })
-      .catch(() => navigate('/'))
+      .catch((error) => {
+        if (error?.response?.status === 403) {
+          toast.error('You are not a member of this room')
+        }
+        navigate('/')
+      })
       .finally(() => setLoading(false))
   }, [id])
 

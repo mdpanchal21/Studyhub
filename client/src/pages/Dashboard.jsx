@@ -53,7 +53,6 @@ export default function Dashboard() {
   }
 
   useEffect(() => { fetchRooms(1, '') }, [])
-
   useEffect(() => {
     const unsubs = [
       onSocketEvent('request-accepted', () => {
@@ -102,6 +101,22 @@ export default function Dashboard() {
 
   return (
     <div>
+      <div className="bg-white rounded-2xl shadow-sm border p-6 mb-6 flex items-center justify-between gap-4 flex-col sm:flex-row">
+        <div>
+          <p className="text-sm font-semibold text-indigo-600 uppercase tracking-wide">Personal AI Study Roadmap</p>
+          <h2 className="text-xl font-bold mt-1">Open your personal roadmap page</h2>
+          <p className="text-sm text-gray-500 mt-2">
+            Generate and manage your roadmap in a separate page.
+          </p>
+        </div>
+        <button
+          onClick={() => navigate('/roadmap')}
+          className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm hover:bg-indigo-700"
+        >
+          Go to Roadmap
+        </button>
+      </div>
+
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-4">
           <h1 className="text-2xl font-bold">

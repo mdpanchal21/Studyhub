@@ -40,7 +40,14 @@ export const generateFlashcards = async (req, res) => {
 
 export const deleteFlashcard = async (req, res) => {
   try {
-    await Flashcard.findByIdAndDelete(req.params.id)
+    const flashcard = await Flashcard.findById(req.params.id)
+    if (!flashcard) {
+      return res.status(404).json({ message: 'Flashcard not found' })
+    }
+    if (flashcard.user.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ message: 'Not authorized' })
+    }
+    await flashcard.deleteOne()
     res.json({ message: 'Flashcard deleted' })
   } catch (error) {
     res.status(500).json({ message: error.message })

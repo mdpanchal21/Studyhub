@@ -1,6 +1,6 @@
 import { Router } from 'express'
 import { protect } from '../middleware/auth.js'
-import { checkRoomRole } from '../middleware/rbac.js'
+import { checkRoomMember, checkRoomRole } from '../middleware/rbac.js'
 import {
   createRoom, getRooms, getRoom, getRoomByCode, joinRoom, leaveRoom, deleteRoom, kickMember,
   getPendingRequests, acceptJoinRequest, declineJoinRequest, deactivateRoom, getRoomHistory,
@@ -13,8 +13,9 @@ router.use(protect)
 router.post('/', createRoom)
 router.get('/', getRooms)
 router.get('/history', getRoomHistory)
-router.get('/:id', getRoom)
 router.post('/join', joinRoom)
+router.use('/:id', checkRoomMember)
+router.get('/:id', getRoom)
 router.post('/:id/leave', leaveRoom)
 router.delete('/:id', deleteRoom)
 

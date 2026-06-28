@@ -86,6 +86,11 @@ export const aiAPI = {
   quiz: (topic, count = 5) => api.post('/ai/quiz', { topic, count }),
 }
 
+export const roadmapAPI = {
+  getLatest: () => api.get('/roadmaps/latest'),
+  create: (data) => api.post('/roadmaps', data),
+}
+
 export const roomSessionAPI = {
   getActive: (roomId) => api.get(`/rooms/${roomId}/active-session`),
   start: (roomId, topic) => api.post(`/rooms/${roomId}/sessions/start`, { topic }),

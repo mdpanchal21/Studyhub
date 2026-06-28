@@ -22,14 +22,15 @@ export default function CreateRoomModal({ onClose, onCreated }) {
   }
 
   return (
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50" onClick={onClose}>
-      <div className="bg-white rounded-xl p-6 w-full max-w-md" onClick={(e) => e.stopPropagation()}>
-        <h2 className="text-lg font-bold mb-4">Create Study Room</h2>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 px-4 backdrop-blur-sm" onClick={onClose}>
+      <div className="surface w-full max-w-md rounded-2xl p-6" onClick={(e) => e.stopPropagation()}>
+        <h2 className="mb-2 text-lg font-semibold text-slate-100">Create Study Room</h2>
+        <p className="mb-4 text-sm text-slate-400">Give the room a name, topic, and subject so it feels clear and intentional.</p>
         <form onSubmit={handleSubmit} className="space-y-3">
           <input
             type="text"
             placeholder="Room Name *"
-            className="w-full px-3 py-2 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-400"
+            className="input-base text-sm"
             value={form.name}
             onChange={(e) => setForm({ ...form, name: e.target.value })}
             required
@@ -37,20 +38,20 @@ export default function CreateRoomModal({ onClose, onCreated }) {
           <input
             type="text"
             placeholder="Topic (e.g. DSA, React)"
-            className="w-full px-3 py-2 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-400"
+            className="input-base text-sm"
             value={form.topic}
             onChange={(e) => setForm({ ...form, topic: e.target.value })}
           />
           <input
             type="text"
             placeholder="Subject"
-            className="w-full px-3 py-2 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-400"
+            className="input-base text-sm"
             value={form.subject}
             onChange={(e) => setForm({ ...form, subject: e.target.value })}
           />
           <textarea
             placeholder="Description (optional)"
-            className="w-full px-3 py-2 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-400 resize-none"
+            className="input-base resize-none text-sm"
             rows={3}
             value={form.description}
             onChange={(e) => setForm({ ...form, description: e.target.value })}
@@ -59,14 +60,14 @@ export default function CreateRoomModal({ onClose, onCreated }) {
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 py-2 border rounded-lg text-sm hover:bg-gray-50"
+              className="button-secondary flex-1 py-2.5"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={loading}
-              className="flex-1 py-2 bg-indigo-600 text-white rounded-lg text-sm hover:bg-indigo-700 disabled:opacity-50"
+              className="button-primary flex-1 py-2.5"
             >
               {loading ? 'Creating...' : 'Create'}
             </button>

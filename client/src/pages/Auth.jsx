@@ -32,17 +32,22 @@ const toggleMode = () => {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-50 to-purple-50">
-      <div className="bg-white p-8 rounded-2xl shadow-lg w-full max-w-md">
-        <h1 className="text-3xl font-bold text-center text-indigo-600 mb-2">StudyHub</h1>
-        <p className="text-center text-gray-500 mb-6">AI-Powered Study Groups</p>
+    <div className="min-h-screen flex items-center justify-center px-4">
+      <div className="surface w-full max-w-md rounded-2xl p-8">
+        <div className="text-center mb-8">
+          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-teal-400 text-slate-950 text-xl font-bold shadow-lg shadow-teal-500/20">
+            S
+          </div>
+          <h1 className="text-3xl font-bold text-slate-100 mb-2">StudyHub</h1>
+          <p className="text-sm text-slate-400">AI-powered study rooms, roadmap, and learning flow</p>
+        </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           {!isLogin && (
             <input
               type="text"
               placeholder="Full Name"
-              className="w-full px-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-indigo-400 outline-none"
+              className="input-base px-4 py-2.5"
               value={form.name}
               onChange={(e) => setForm({ ...form, name: e.target.value })}
               required
@@ -51,7 +56,7 @@ const toggleMode = () => {
           <input
             type="email"
             placeholder="Email"
-            className="w-full px-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-indigo-400 outline-none"
+            className="input-base px-4 py-2.5"
             value={form.email}
             onChange={(e) => setForm({ ...form, email: e.target.value })}
             required
@@ -59,7 +64,7 @@ const toggleMode = () => {
           <input
             type="password"
             placeholder="Password"
-            className="w-full px-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-indigo-400 outline-none"
+            className="input-base px-4 py-2.5"
             value={form.password}
             onChange={(e) => setForm({ ...form, password: e.target.value })}
             required
@@ -67,7 +72,7 @@ const toggleMode = () => {
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-indigo-600 text-white py-2.5 rounded-lg hover:bg-indigo-700 disabled:opacity-50"
+            className="button-primary w-full py-2.5"
           >
             {loading ? 'Please wait...' : isLogin ? 'Login' : 'Register'}
           </button>
@@ -77,7 +82,7 @@ const toggleMode = () => {
           {isLogin ? "Don't have an account? " : 'Already have an account? '}
           <button
             onClick={toggleMode}
-            className="text-indigo-600 hover:underline"
+            className="text-teal-300 hover:text-teal-200 hover:underline"
           >
             {isLogin ? 'Register' : 'Login'}
           </button>

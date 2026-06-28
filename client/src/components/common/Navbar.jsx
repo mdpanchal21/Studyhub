@@ -49,16 +49,17 @@ export default function Navbar() {
   }
 
   return (
-    <nav className="bg-white shadow-sm border-b relative z-50">
-      <div className="max-w-7xl mx-auto px-4 h-14 flex items-center justify-between">
-        <Link to="/" className="text-xl font-bold text-indigo-600">
-          StudyHub
+    <nav className="sticky top-0 z-50 border-b border-white/10 bg-slate-950/75 backdrop-blur-xl relative">
+      <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
+        <Link to="/" className="flex items-center gap-2 text-lg font-semibold text-slate-100 tracking-tight">
+          <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-teal-400 text-slate-950 shadow-lg shadow-teal-500/20">S</span>
+          <span>StudyHub</span>
         </Link>
         <div className="flex items-center gap-4">
-          <Link to="/flashcards" className="text-sm text-gray-600 hover:text-indigo-600">
+          <Link to="/flashcards" className="text-sm text-slate-300 transition hover:text-teal-300">
             Flashcards
           </Link>
-          <Link to="/profile" className="text-sm text-gray-600 hover:text-indigo-600">
+          <Link to="/profile" className="text-sm text-slate-300 transition hover:text-teal-300">
             Profile
           </Link>
 
@@ -66,11 +67,11 @@ export default function Navbar() {
           <div className="relative">
             <button
               onClick={() => setShowDropdown((v) => !v)}
-              className="relative p-1.5 rounded-full hover:bg-gray-100 transition"
+              className="relative rounded-full p-2 transition hover:bg-white/10 surface-soft"
               aria-label="Notifications"
             >
               {/* Bell icon */}
-              <svg className="w-5 h-5 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <svg className="w-5 h-5 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round"
                   d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
                 />
@@ -89,23 +90,23 @@ export default function Navbar() {
                   className="fixed inset-0"
                   onClick={() => setShowDropdown(false)}
                 />
-                <div className="absolute right-0 mt-2 w-80 bg-white border rounded-xl shadow-lg overflow-hidden">
-                  <div className="flex items-center justify-between px-4 py-2.5 border-b">
-                    <span className="text-sm font-semibold text-gray-800">
+                <div className="absolute right-0 mt-2 w-80 surface overflow-hidden rounded-2xl">
+                  <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
+                    <span className="text-sm font-semibold text-slate-100">
                       Notifications
                     </span>
                     {unreadCount > 0 && (
                       <button
                         onClick={handleMarkAllRead}
-                        className="text-xs text-indigo-600 hover:underline"
+                        className="text-xs text-teal-300 hover:text-teal-200"
                       >
                         Mark all read
                       </button>
                     )}
                   </div>
-                  <div className="max-h-80 overflow-y-auto divide-y">
+                  <div className="max-h-80 overflow-y-auto divide-y divide-white/10">
                     {notifications.length === 0 ? (
-                      <p className="text-center text-sm text-gray-400 py-8">
+                      <p className="py-8 text-center text-sm text-slate-400">
                         No notifications yet
                       </p>
                     ) : (
@@ -113,8 +114,8 @@ export default function Navbar() {
                         <div
                           key={n._id}
                           onClick={() => handleMarkRead(n._id)}
-                          className={`px-4 py-3 cursor-pointer hover:bg-gray-50 transition ${
-                            !n.isRead ? 'bg-indigo-50' : ''
+                          className={`cursor-pointer px-4 py-3 transition hover:bg-white/5 ${
+                            !n.isRead ? 'bg-teal-500/10' : ''
                           }`}
                         >
                           {n.link ? (
@@ -138,10 +139,10 @@ export default function Navbar() {
           </div>
           {/* ────────────────────────────────────────────────────────────── */}
 
-          <span className="text-sm text-gray-500">{user?.name}</span>
+          <span className="text-sm text-slate-400">{user?.name}</span>
           <button
             onClick={logout}
-            className="text-sm text-red-500 hover:text-red-700"
+            className="text-sm text-rose-400 hover:text-rose-300"
           >
             Logout
           </button>
@@ -163,13 +164,13 @@ function NotificationItem({ n }) {
     <div className="flex gap-2 items-start">
       <span className="text-base mt-0.5">{iconMap[n.type] || 'ℹ️'}</span>
       <div className="flex-1 min-w-0">
-        <p className="text-sm text-gray-700 leading-snug">{n.message}</p>
-        <p className="text-[11px] text-gray-400 mt-0.5">
+        <p className="text-sm text-slate-200 leading-snug">{n.message}</p>
+        <p className="mt-0.5 text-[11px] text-slate-500">
           {new Date(n.createdAt).toLocaleString()}
         </p>
       </div>
       {!n.isRead && (
-        <span className="w-2 h-2 bg-indigo-500 rounded-full mt-1.5 flex-shrink-0" />
+        <span className="mt-1.5 h-2 w-2 flex-shrink-0 rounded-full bg-teal-400 shadow-[0_0_0_4px_rgba(45,212,191,0.16)]" />
       )}
     </div>
   )
