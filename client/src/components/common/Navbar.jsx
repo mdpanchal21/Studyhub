@@ -50,7 +50,7 @@ export default function Navbar() {
 
   return (
     <nav className="sticky top-0 z-50 border-b border-white/10 bg-slate-950/75 backdrop-blur-xl relative">
-      <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
+      <div className="px-6 lg:px-8 h-16 flex items-center justify-between">
         <Link to="/" className="flex items-center gap-2 text-lg font-semibold text-slate-100 tracking-tight">
           <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-teal-400 text-slate-950 shadow-lg shadow-teal-500/20">S</span>
           <span>StudyHub</span>

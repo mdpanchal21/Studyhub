@@ -87,7 +87,9 @@ export const aiAPI = {
 }
 
 export const roadmapAPI = {
+  list: () => api.get('/roadmaps'),
   getLatest: () => api.get('/roadmaps/latest'),
+  getOne: (id) => api.get(`/roadmaps/${id}`),
   create: (data) => api.post('/roadmaps', data),
 }
 

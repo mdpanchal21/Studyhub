@@ -33,13 +33,19 @@ export function AuthProvider({ children }) {
     return res.data
   }
 
+  const oauthLogin = async (token) => {
+    localStorage.setItem('token', token)
+    const res = await authAPI.getMe()
+    setUser(res.data.user)
+  }
+
   const logout = () => {
     localStorage.removeItem('token')
     setUser(null)
   }
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, logout }}>
+    <AuthContext.Provider value={{ user, loading, login, register, oauthLogin, logout }}>
       {children}
     </AuthContext.Provider>
   )

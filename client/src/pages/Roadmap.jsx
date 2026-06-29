@@ -3,9 +3,87 @@ import { roadmapAPI } from '../services/api'
 import Skeleton from 'react-loading-skeleton'
 import toast from 'react-hot-toast'
 
+function RoadmapSkeleton() {
+  return (
+    <div className="space-y-3">
+      <Skeleton height={24} width="35%" />
+      <Skeleton height={14} width="60%" />
+      <Skeleton height={18} width="100%" />
+    </div>
+  )
+}
+
+function RoadmapView({ roadmap }) {
+  const tasks = roadmap?.plan?.flatMap((w) => w.tasks || []) || []
+  const total = roadmap?.progress?.totalTasks || tasks.length
+  const completed = roadmap?.progress?.completedTasks || 0
+  const pct = total > 0 ? Math.round((completed / total) * 100) : 0
+
+  return (
+    <div>
+      {/* Title + progress */}
+      <div className="flex items-center justify-between gap-4 flex-wrap mb-4">
+        <div>
+          <h3 className="text-lg font-bold text-slate-100">{roadmap?.title || 'Study Roadmap'}</h3>
+          {roadmap?.summary && <p className="text-sm text-slate-400 mt-0.5">{roadmap.summary}</p>}
+        </div>
+        {pct > 0 && (
+          <span className="text-xs font-semibold text-teal-400 whitespace-nowrap">{pct}% done</span>
+        )}
+      </div>
+      {pct > 0 && (
+        <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden mb-5">
+          <div className="h-full bg-teal-500 rounded-full transition-all" style={{ width: `${pct}%` }} />
+        </div>
+      )}
+
+      {/* Timeline weeks */}
+      <div className="space-y-0">
+        {(roadmap?.plan || []).map((week, idx) => (
+          <div key={week.weekNumber} className="relative flex gap-4 pb-6 last:pb-0">
+            {/* Timeline line + dot */}
+            <div className="flex flex-col items-center">
+              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-teal-500/20 border-2 border-teal-500/40 text-xs font-bold text-teal-400 z-10">
+                {week.weekNumber}
+              </div>
+              {idx < (roadmap?.plan?.length || 0) - 1 && (
+                <div className="w-px flex-1 bg-white/10 mt-1" />
+              )}
+            </div>
+            {/* Content */}
+            <div className="flex-1 min-w-0 pt-0.5">
+              <p className="text-xs font-semibold uppercase tracking-wider text-teal-400">Week {week.weekNumber}</p>
+              <h4 className="font-bold text-slate-100 mt-0.5">{week.theme}</h4>
+              {week.focus && <p className="text-sm text-slate-400 mt-0.5">{week.focus}</p>}
+              <ul className="mt-2 space-y-1">
+                {(week.tasks || []).map((task, i) => (
+                  <li key={i} className="text-sm text-slate-300 flex items-start gap-2">
+                    <span className="text-teal-400 mt-1 flex-shrink-0">&#8226;</span>
+                    <span>
+                      <span className="font-medium text-slate-200">{task.day}:</span>{' '}
+                      {task.title}
+                      {task.details && <span className="text-slate-500"> &mdash; {task.details}</span>}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 export default function Roadmap() {
   const [roadmap, setRoadmap] = useState(null)
+  const [roadmaps, setRoadmaps] = useState([])
   const [loadingRoadmap, setLoadingRoadmap] = useState(true)
+  const [generating, setGenerating] = useState(false)
+  const [partialRoadmap, setPartialRoadmap] = useState(null)
+  const [showHistory, setShowHistory] = useState(false)
+  const [loadingHistory, setLoadingHistory] = useState(false)
+
   const [roadmapForm, setRoadmapForm] = useState({
     targetRole: '',
     currentLevel: 'beginner',
@@ -28,210 +106,335 @@ export default function Roadmap() {
     }
   }
 
+  const fetchRoadmaps = async () => {
+    setLoadingHistory(true)
+    try {
+      const res = await roadmapAPI.list()
+      setRoadmaps(res.data.roadmaps || [])
+    } catch {
+      // silent
+    } finally {
+      setLoadingHistory(false)
+    }
+  }
+
+  const loadRoadmap = async (id) => {
+    try {
+      const res = await roadmapAPI.getOne(id)
+      setRoadmap(res.data.roadmap)
+      setPartialRoadmap(null)
+      setShowHistory(false)
+    } catch {
+      toast.error('Failed to load roadmap')
+    }
+  }
+
   useEffect(() => {
     fetchRoadmap()
+    fetchRoadmaps()
   }, [])
 
   const handleCreateRoadmap = async (e) => {
     e.preventDefault()
+    setGenerating(true)
+    setPartialRoadmap(null)
+    setRoadmap(null)
+
     try {
-      const res = await roadmapAPI.create({
-        ...roadmapForm,
-        hoursPerDay: Number(roadmapForm.hoursPerDay),
-        durationWeeks: Number(roadmapForm.durationWeeks),
+      const token = localStorage.getItem('token')
+      const response = await fetch('/api/roadmaps/generate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          ...roadmapForm,
+          hoursPerDay: Number(roadmapForm.hoursPerDay),
+          durationWeeks: Number(roadmapForm.durationWeeks),
+        }),
       })
-      setRoadmap(res.data.roadmap)
-      toast.success('Roadmap generated')
+
+      const reader = response.body.getReader()
+      const decoder = new TextDecoder()
+      let chunkBuf = ''
+
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+
+        chunkBuf += decoder.decode(value, { stream: true })
+        const lines = chunkBuf.split('\n')
+        chunkBuf = lines.pop() || ''
+
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue
+          try {
+            const data = JSON.parse(line.slice(6))
+            if (data.type === 'progress') {
+              setPartialRoadmap({
+                title: data.title || 'Study Roadmap',
+                summary: data.summary || '',
+                plan: (data.plan || []).map((w) => ({
+                  weekNumber: w.weekNumber,
+                  theme: w.theme,
+                  focus: w.focus,
+                  tasks: (w.tasks || []).map((t) => ({
+                    day: t.day,
+                    title: t.title,
+                    details: t.details,
+                  })),
+                })),
+              })
+            } else if (data.type === 'done') {
+              setRoadmap(data.roadmap)
+              setPartialRoadmap(null)
+              setGenerating(false)
+              toast.success('Roadmap generated')
+              fetchRoadmaps()
+            } else if (data.type === 'error') {
+              toast.error(data.message)
+              setGenerating(false)
+            }
+          } catch {
+            // skip malformed chunks
+          }
+        }
+      }
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Failed to generate roadmap')
+      toast.error('Failed to generate roadmap')
+    } finally {
+      setGenerating(false)
     }
   }
 
-  const roadmapTasks = roadmap?.plan?.flatMap((week) => week.tasks || []) || []
-  const completedRoadmapTasks = roadmap?.progress?.completedTasks || 0
-  const totalRoadmapTasks = roadmap?.progress?.totalTasks || roadmapTasks.length
-  const roadmapProgress = totalRoadmapTasks > 0 ? Math.round((completedRoadmapTasks / totalRoadmapTasks) * 100) : 0
-
   return (
-    <div className="max-w-6xl mx-auto">
-      <div className="bg-white rounded-2xl shadow-sm border p-6 mb-6">
-        <div className="flex items-start justify-between gap-6 flex-col lg:flex-row">
-          <div className="max-w-2xl">
-            <p className="text-sm font-semibold text-indigo-600 uppercase tracking-wide">Personal AI Study Roadmap</p>
-            <h1 className="text-2xl font-bold mt-1">Build a study plan that fits your goal</h1>
-            <p className="text-sm text-gray-500 mt-2">
-              Tell us what role you want, how much time you can study, and which topics you already know.
-              The AI will turn it into a clear week-by-week roadmap.
-            </p>
-          </div>
-          <div className="rounded-xl bg-indigo-50 border border-indigo-100 p-4 text-sm text-indigo-900 w-full lg:max-w-sm">
-            <p className="font-semibold">How to fill it</p>
-            <p className="mt-1 text-indigo-900/80">
-              Example: target role = <span className="font-medium">Frontend Developer</span>, level = <span className="font-medium">Beginner</span>,
-              hours/day = <span className="font-medium">2</span>, duration = <span className="font-medium">4 weeks</span>.
-            </p>
-          </div>
-        </div>
+    <div className="max-w-4xl mx-auto">
+      {/* Header */}
+      <div className="mb-6">
+        <p className="text-xs font-semibold uppercase tracking-widest text-teal-400">Personal AI Study Roadmap</p>
+        <h1 className="text-2xl font-bold text-slate-100 mt-1">Build a study plan</h1>
+        <p className="text-sm text-slate-400 mt-1 max-w-lg">
+          Tell us your goal, schedule, and background. The AI creates a week-by-week roadmap.
+        </p>
+      </div>
 
-        <form onSubmit={handleCreateRoadmap} className="mt-6 space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <form onSubmit={handleCreateRoadmap} className="space-y-4">
+        {/* Goal */}
+        <div className="surface rounded-xl p-5">
+          <p className="text-xs font-semibold uppercase tracking-wider text-teal-400 mb-3">Goal</p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <label className="block">
-              <span className="block text-sm font-medium text-gray-700 mb-1">Target role</span>
+              <span className="block text-xs font-medium text-slate-400 mb-1">Target role</span>
               <input
                 type="text"
-                placeholder="e.g. Frontend Developer, Backend Developer, AI Beginner"
+                placeholder="e.g. Frontend Developer"
                 value={roadmapForm.targetRole}
                 onChange={(e) => setRoadmapForm((prev) => ({ ...prev, targetRole: e.target.value }))}
-                className="w-full px-3 py-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-indigo-400 outline-none"
+                className="input-base"
                 required
+                disabled={generating}
               />
-              <span className="block text-xs text-gray-400 mt-1">Choose the job or learning direction you want to prepare for.</span>
             </label>
-
             <label className="block">
-              <span className="block text-sm font-medium text-gray-700 mb-1">Your current level</span>
+              <span className="block text-xs font-medium text-slate-400 mb-1">Current level</span>
               <select
                 value={roadmapForm.currentLevel}
                 onChange={(e) => setRoadmapForm((prev) => ({ ...prev, currentLevel: e.target.value }))}
-                className="w-full px-3 py-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-indigo-400 outline-none bg-white"
+                className="input-base"
+                disabled={generating}
               >
-                <option value="beginner">Beginner - starting from basics</option>
-                <option value="intermediate">Intermediate - already know the fundamentals</option>
-                <option value="revision">Revision - want to review before interview</option>
+                <option value="beginner">Beginner</option>
+                <option value="intermediate">Intermediate</option>
+                <option value="revision">Revision</option>
               </select>
-              <span className="block text-xs text-gray-400 mt-1">This helps the AI set the right difficulty level.</span>
             </label>
           </div>
+        </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {/* Schedule */}
+        <div className="surface rounded-xl p-5">
+          <p className="text-xs font-semibold uppercase tracking-wider text-teal-400 mb-3">Schedule</p>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <label className="block">
-              <span className="block text-sm font-medium text-gray-700 mb-1">Study time per day</span>
+              <span className="block text-xs font-medium text-slate-400 mb-1">Hours / day</span>
               <input
                 type="number"
                 min="1"
-                placeholder="e.g. 2"
+                placeholder="2"
                 value={roadmapForm.hoursPerDay}
                 onChange={(e) => setRoadmapForm((prev) => ({ ...prev, hoursPerDay: e.target.value }))}
-                className="w-full px-3 py-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-indigo-400 outline-none"
+                className="input-base"
                 required
+                disabled={generating}
               />
-              <span className="block text-xs text-gray-400 mt-1">How many hours can you study daily?</span>
             </label>
-
             <label className="block">
-              <span className="block text-sm font-medium text-gray-700 mb-1">Roadmap length in weeks</span>
+              <span className="block text-xs font-medium text-slate-400 mb-1">Duration (weeks)</span>
               <input
                 type="number"
                 min="1"
-                placeholder="e.g. 4"
+                placeholder="4"
                 value={roadmapForm.durationWeeks}
                 onChange={(e) => setRoadmapForm((prev) => ({ ...prev, durationWeeks: e.target.value }))}
-                className="w-full px-3 py-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-indigo-400 outline-none"
+                className="input-base"
                 required
+                disabled={generating}
               />
-              <span className="block text-xs text-gray-400 mt-1">Use 2, 4, 6, or 8 weeks depending on your target date.</span>
             </label>
-
             <label className="block">
-              <span className="block text-sm font-medium text-gray-700 mb-1">Target interview date</span>
+              <span className="block text-xs font-medium text-slate-400 mb-1">Target date</span>
               <input
                 type="date"
                 value={roadmapForm.targetDate}
                 onChange={(e) => setRoadmapForm((prev) => ({ ...prev, targetDate: e.target.value }))}
-                className="w-full px-3 py-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-indigo-400 outline-none"
+                className="input-base"
+                disabled={generating}
               />
-              <span className="block text-xs text-gray-400 mt-1">Optional, but useful for a more realistic plan.</span>
             </label>
           </div>
+        </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* Topics */}
+        <div className="surface rounded-xl p-5">
+          <p className="text-xs font-semibold uppercase tracking-wider text-teal-400 mb-3">Topics</p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <label className="block">
-              <span className="block text-sm font-medium text-gray-700 mb-1">Topics you already know</span>
+              <span className="block text-xs font-medium text-slate-400 mb-1">Already known</span>
               <textarea
-                rows="4"
-                placeholder="e.g. HTML, CSS, JavaScript basics"
+                rows="3"
+                placeholder="HTML, CSS, JavaScript basics"
                 value={roadmapForm.knownTopics}
                 onChange={(e) => setRoadmapForm((prev) => ({ ...prev, knownTopics: e.target.value }))}
-                className="w-full px-3 py-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-indigo-400 outline-none resize-none"
+                className="input-base resize-none"
+                disabled={generating}
               />
-              <span className="block text-xs text-gray-400 mt-1">Write topics separated by commas so the AI can avoid repeating basics.</span>
             </label>
-
             <label className="block">
-              <span className="block text-sm font-medium text-gray-700 mb-1">Topics you want to improve</span>
+              <span className="block text-xs font-medium text-slate-400 mb-1">Need to improve</span>
               <textarea
-                rows="4"
-                placeholder="e.g. React hooks, async/await, Node.js APIs"
+                rows="3"
+                placeholder="React hooks, async/await, Node.js APIs"
                 value={roadmapForm.weakTopics}
                 onChange={(e) => setRoadmapForm((prev) => ({ ...prev, weakTopics: e.target.value }))}
-                className="w-full px-3 py-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-indigo-400 outline-none resize-none"
+                className="input-base resize-none"
+                disabled={generating}
               />
-              <span className="block text-xs text-gray-400 mt-1">These topics will get extra focus in the roadmap.</span>
             </label>
           </div>
+        </div>
 
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pt-2">
-            <p className="text-xs text-gray-400">
-              You can regenerate the roadmap anytime if your goal or schedule changes.
-            </p>
-            <button
-              type="submit"
-              className="px-5 py-2.5 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 transition"
-            >
-              Generate roadmap
-            </button>
-          </div>
-        </form>
+        {/* Submit */}
+        <div className="flex items-center justify-end gap-3 pt-1">
+          <button
+            type="submit"
+            disabled={generating}
+            className="button-primary"
+          >
+            {generating ? (
+              <>
+                <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                </svg>
+                Generating...
+              </>
+            ) : (
+              'Generate roadmap'
+            )}
+          </button>
+        </div>
+      </form>
 
-        <div className="mt-6">
-          {loadingRoadmap ? (
-            <div className="space-y-3">
-              <Skeleton height={24} width="35%" />
-              <Skeleton height={14} width="60%" />
-              <Skeleton height={18} width="100%" />
+      {/* Output */}
+      <div className="mt-6">
+        {loadingRoadmap ? (
+          <RoadmapSkeleton />
+        ) : generating ? (
+          <div>
+            <div className="flex items-center gap-3 mb-4">
+              <div className="flex gap-1">
+                <span className="w-2 h-2 bg-teal-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                <span className="w-2 h-2 bg-teal-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                <span className="w-2 h-2 bg-teal-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+              </div>
+              <p className="text-sm font-medium text-slate-300">AI is building your roadmap...</p>
             </div>
-          ) : roadmap ? (
-            <div>
-              <div className="flex items-center justify-between gap-4 flex-wrap">
-                <div>
-                  <h3 className="text-lg font-bold">{roadmap.title}</h3>
-                  <p className="text-sm text-gray-500">{roadmap.summary || 'Your personalized roadmap is ready.'}</p>
-                </div>
-                <div className="text-sm text-gray-500">
-                  <span className="font-semibold text-gray-700">{roadmapProgress}%</span> complete
-                </div>
-              </div>
-              <div className="mt-3 h-2 w-full bg-gray-100 rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-indigo-600 rounded-full transition-all"
-                  style={{ width: `${roadmapProgress}%` }}
-                />
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 mt-5">
-                {roadmap.plan.map((week) => (
-                  <div key={week.weekNumber} className="border rounded-xl p-4 bg-gray-50">
-                    <p className="text-xs font-semibold text-indigo-600 uppercase">Week {week.weekNumber}</p>
-                    <h4 className="font-bold mt-1">{week.theme}</h4>
-                    {week.focus && <p className="text-sm text-gray-500 mt-1">{week.focus}</p>}
-                    <ul className="mt-3 space-y-2">
-                      {week.tasks.map((task, index) => (
-                        <li key={`${week.weekNumber}-${index}`} className="text-sm bg-white border rounded-lg p-3">
-                          <p className="font-medium text-gray-800">{task.day}: {task.title}</p>
-                          {task.details && <p className="text-gray-500 text-xs mt-1">{task.details}</p>}
-                        </li>
-                      ))}
-                    </ul>
+            {partialRoadmap ? (
+              <RoadmapView roadmap={partialRoadmap} />
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {[1, 2, 3].map((i) => (
+                  <div key={i} className="surface rounded-xl p-5">
+                    <Skeleton height={14} width="40%" className="mb-2" containerClassName="block" />
+                    <Skeleton height={20} width="70%" className="mb-3" containerClassName="block" />
+                    <div className="space-y-2">
+                      <Skeleton height={48} containerClassName="block" />
+                      <Skeleton height={48} containerClassName="block" />
+                      <Skeleton height={48} containerClassName="block" />
+                    </div>
                   </div>
                 ))}
               </div>
-            </div>
-          ) : (
-            <div className="text-sm text-gray-500 border border-dashed rounded-xl p-4 bg-gray-50">
-              No roadmap generated yet. Fill the form above to create your personal learning roadmap.
+            )}
+          </div>
+        ) : roadmap ? (
+          <RoadmapView roadmap={roadmap} />
+        ) : (
+          <div className="text-sm text-slate-500 border border-dashed border-white/10 rounded-xl p-6 bg-white/5 text-center">
+            No roadmap generated yet. Fill the form above to create your personal learning roadmap.
+          </div>
+        )}
+      </div>
+
+      {/* Past roadmaps */}
+      {roadmaps.length > 1 && (
+        <div className="mt-6">
+          <button
+            onClick={() => setShowHistory((v) => !v)}
+            className="flex items-center gap-2 text-sm text-slate-400 hover:text-slate-200 transition"
+          >
+            <svg
+              className={`w-4 h-4 transition-transform ${showHistory ? 'rotate-90' : ''}`}
+              fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+            </svg>
+            Past roadmaps ({roadmaps.length - 1})
+          </button>
+
+          {showHistory && (
+            <div className="mt-3 space-y-2">
+              {loadingHistory ? (
+                <p className="text-sm text-slate-500">Loading...</p>
+              ) : (
+                roadmaps
+                  .filter((r) => r._id !== roadmap?._id)
+                  .map((r) => (
+                    <button
+                      key={r._id}
+                      onClick={() => loadRoadmap(r._id)}
+                      className="w-full text-left surface rounded-xl p-4 transition hover:bg-white/[0.07]"
+                    >
+                      <div className="flex items-center justify-between gap-3 flex-wrap">
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium text-slate-200 truncate">
+                            {r.title || `${r.targetRole} study roadmap`}
+                          </p>
+                          <p className="text-xs text-slate-500 mt-0.5">
+                            {r.targetRole} &middot; {r.durationWeeks} weeks &middot;{' '}
+                            {new Date(r.createdAt).toLocaleDateString()}
+                          </p>
+                        </div>
+                        <span className="text-xs text-teal-400 whitespace-nowrap">Load &rarr;</span>
+                      </div>
+                    </button>
+                  ))
+              )}
             </div>
           )}
         </div>
-      </div>
+      )}
     </div>
   )
 }
