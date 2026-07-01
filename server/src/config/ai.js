@@ -22,6 +22,27 @@ export const getAIResponse = async (prompt) => {
   }
 }
 
+export const getAIResponseStructured = async (prompt, schema) => {
+  if (!genAI) {
+    throw new Error('AI not configured. Set GEMINI_API_KEY in .env')
+  }
+  try {
+    const model = genAI.getGenerativeModel({
+      model: 'gemini-2.5-flash',
+      generationConfig: {
+        responseMimeType: 'application/json',
+        responseSchema: schema,
+      },
+    })
+    const result = await model.generateContent(prompt)
+    const text = result.response.text()
+    return JSON.parse(text)
+  } catch (error) {
+    console.error('AI structured error:', error.message)
+    throw error
+  }
+}
+
 export const getAIResponseStream = async (prompt, onChunk) => {
   if (!genAI) {
     throw new Error('AI not configured. Set GEMINI_API_KEY in .env')

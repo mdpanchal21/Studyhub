@@ -1,4 +1,4 @@
-import { getAIResponse } from '../config/ai.js'
+import { getAIResponse, getAIResponseStructured } from '../config/ai.js'
 import Doubt from '../models/Doubt.js'
 import Flashcard from '../models/Flashcard.js'
 
@@ -32,15 +32,20 @@ export const explainDoubt = async (req, res) => {
 export const generateQuiz = async (req, res) => {
   try {
     const { topic, count = 5 } = req.body
-    const prompt = `Generate ${count} quiz questions about "${topic}" in JSON format like [{"question": "...", "options": ["a", "b", "c", "d"], "correctAnswer": "a", "explanation": "..."}]`
-    const result = await getAIResponse(prompt)
-    let questions
-    try {
-      const jsonStr = result.text.replace(/```json|```/g, '').trim()
-      questions = JSON.parse(jsonStr)
-    } catch {
-      questions = [{ question: 'Could not parse AI response', options: [], correctAnswer: '', explanation: result.text }]
-    }
+    const prompt = `Generate ${count} quiz questions about "${topic}". Each question must have exactly 4 options. The correctAnswer must exactly match one of the option values.`
+    const questions = await getAIResponseStructured(prompt, {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          question: { type: 'string' },
+          options: { type: 'array', items: { type: 'string' } },
+          correctAnswer: { type: 'string' },
+          explanation: { type: 'string' },
+        },
+        required: ['question', 'options', 'correctAnswer', 'explanation'],
+      },
+    })
     res.json({ questions })
   } catch (error) {
     res.status(500).json({ message: error.message })
