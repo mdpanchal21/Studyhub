@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect, useRef } from 'react'
 
 const OPTION_LABELS = ['A', 'B', 'C', 'D']
 
@@ -9,7 +9,7 @@ const cleanOption = (opt) => {
   return opt
 }
 
-export default function QuizView({ questions, topic, onBack }) {
+export default function QuizView({ questions, topic, onBack, onSave, savedQuiz }) {
   const cleaned = useMemo(() =>
     questions.map((q) => ({
       ...q,
@@ -19,8 +19,30 @@ export default function QuizView({ questions, topic, onBack }) {
     [questions]
   )
   const [currentIndex, setCurrentIndex] = useState(0)
-  const [answers, setAnswers] = useState({})
-  const [submitted, setSubmitted] = useState(false)
+  const [answers, setAnswers] = useState(savedQuiz
+    ? Object.fromEntries(savedQuiz.results.map((r) => [r.questionIndex, r.selected]))
+    : {}
+  )
+  const [submitted, setSubmitted] = useState(!!savedQuiz)
+  const savedRef = useRef(false)
+
+  useEffect(() => {
+    if (submitted && onSave && !savedQuiz && !savedRef.current) {
+      const correctCount = cleaned.filter((q, i) => answers[i] === q.correctAnswer).length
+      savedRef.current = true
+      onSave({
+        topic,
+        questions: cleaned,
+        results: cleaned.map((q, i) => ({
+          questionIndex: i,
+          selected: answers[i],
+          correct: answers[i] === q.correctAnswer,
+        })),
+        score: correctCount,
+        total: cleaned.length,
+      })
+    }
+  }, [submitted])
 
   if (cleaned.length === 0) {
     return (
@@ -34,6 +56,7 @@ export default function QuizView({ questions, topic, onBack }) {
   const selected = answers[currentIndex]
 
   const handleSelect = (opt) => {
+    if (submitted) return
     if (selected === opt) {
       const { [currentIndex]: _, ...rest } = answers
       setAnswers(rest)
@@ -73,6 +96,11 @@ export default function QuizView({ questions, topic, onBack }) {
           <div className="text-5xl mb-3">{percentage >= 60 ? '🎉' : '📚'}</div>
           <h2 className="text-xl font-bold mb-1">{grade}</h2>
           <p className="text-sm text-gray-500">Quiz: {topic}</p>
+          {savedQuiz && (
+            <p className="text-xs text-gray-400 mt-1">
+              {new Date(savedQuiz.createdAt).toLocaleDateString()}
+            </p>
+          )}
           <div className="mt-4">
             <span className="text-4xl font-bold">{correctCount}</span>
             <span className="text-gray-400 text-lg">/{total}</span>
@@ -111,12 +139,14 @@ export default function QuizView({ questions, topic, onBack }) {
         </div>
 
         <div className="flex gap-3 justify-center">
-          <button
-            onClick={() => { setCurrentIndex(0); setAnswers({}); setSubmitted(false) }}
-            className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm hover:bg-indigo-700 transition"
-          >
-            Retry
-          </button>
+          {!savedQuiz && (
+            <button
+              onClick={() => { setCurrentIndex(0); setAnswers({}); setSubmitted(false); savedRef.current = false }}
+              className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm hover:bg-indigo-700 transition"
+            >
+              Retry
+            </button>
+          )}
           <button
             onClick={onBack}
             className="px-4 py-2 border rounded-lg text-sm hover:bg-gray-50 transition"

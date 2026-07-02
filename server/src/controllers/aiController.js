@@ -31,8 +31,19 @@ export const explainDoubt = async (req, res) => {
 
 export const generateQuiz = async (req, res) => {
   try {
-    const { topic, count = 5 } = req.body
-    const prompt = `Generate ${count} quiz questions about "${topic}". Each question must have exactly 4 options. The correctAnswer must exactly match one of the option values.`
+    const { topic, roomId, count = 5, topics } = req.body
+    let context = ''
+    if (roomId) {
+      const filter = { room: roomId }
+      if (topics && topics.length > 0) filter.topic = { $in: topics }
+      const flashcards = await Flashcard.find(filter)
+      if (flashcards.length > 0) {
+        context = '\n\nBase the questions on these flashcards:\n' +
+          flashcards.map((f, i) => `${i + 1}. Q: ${f.question}\n   A: ${f.answer}`).join('\n')
+      }
+    }
+    const label = topics && topics.length > 0 ? topics.join(', ') : topic
+    const prompt = `Generate ${count} multiple-choice quiz questions about "${label}". Each question must have exactly 4 options. The correctAnswer must exactly match one of the option values.${context}`
     const questions = await getAIResponseStructured(prompt, {
       type: 'array',
       items: {

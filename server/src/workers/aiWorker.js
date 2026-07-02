@@ -22,7 +22,7 @@ const processAIJob = async (data) => {
       const cards = JSON.parse(jsonStr)
       const created = []
       for (const card of cards) {
-        const doc = await Flashcard.create({ user: userId, room: roomId, question: card.question, answer: card.answer })
+        const doc = await Flashcard.create({ user: userId, room: roomId, topic, question: card.question, answer: card.answer })
         created.push(doc)
       }
       console.log(`Generated ${cards.length} flashcards for: ${topic}`)

@@ -83,7 +83,13 @@ export const notificationAPI = {
 export const aiAPI = {
   ask: (question) => api.post('/ai/ask', { question }),
   explainDoubt: (id) => api.post(`/ai/explain/${id}`),
-  quiz: (topic, count = 5) => api.post('/ai/quiz', { topic, count }),
+  quiz: (topic, count = 5, roomId, topics) => api.post('/ai/quiz', { topic, count, roomId, topics }),
+}
+
+export const quizAPI = {
+  save: (data) => api.post('/quizzes', data),
+  list: () => api.get('/quizzes'),
+  getOne: (id) => api.get(`/quizzes/${id}`),
 }
 
 export const roadmapAPI = {

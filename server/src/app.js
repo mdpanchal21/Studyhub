@@ -16,6 +16,7 @@ import videoRoutes from './routes/video.js'
 import notificationRoutes from './routes/notifications.js'
 import aiRoutes from './routes/ai.js'
 import roadmapRoutes from './routes/roadmaps.js'
+import quizRoutes from './routes/quiz.js'
 
 const app = express()
 
@@ -36,6 +37,7 @@ app.use('/api/rooms', videoRoutes)
 app.use('/api/notifications', notificationRoutes)
 app.use('/api/ai', aiRoutes)
 app.use('/api/roadmaps', roadmapRoutes)
+app.use('/api/quizzes', quizRoutes)
 
 app.get('/api/health', (req, res) => res.json({ status: 'ok' }))
 
