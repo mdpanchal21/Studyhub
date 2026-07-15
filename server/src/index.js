@@ -21,16 +21,29 @@ const server = http.createServer(app)
 
 setupSocket(server, app)
 
+let aiWorkerRef
+let emailWorkerRef
+
 const start = async () => {
   await connectDB()
   initAI()
 
-  startAIWorker()
-  startEmailWorker()
+  aiWorkerRef = startAIWorker()
+  emailWorkerRef = startEmailWorker()
 
   server.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`)
   })
 }
+
+const gracefulShutdown = async (signal) => {
+  console.log(`\n${signal} received. Shutting down gracefully...`)
+  if (aiWorkerRef) await aiWorkerRef.close()
+  if (emailWorkerRef) await emailWorkerRef.close()
+  process.exit(0)
+}
+
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'))
+process.on('SIGINT', () => gracefulShutdown('SIGINT'))
 
 start()

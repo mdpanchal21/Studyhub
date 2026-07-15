@@ -1,18 +1,21 @@
-import { getAIResponse, getAIResponseStream } from '../config/ai.js'
+import { Worker } from 'bullmq'
+import { getAIResponseStream } from '../config/ai.js'
 import Doubt from '../models/Doubt.js'
 import Flashcard from '../models/Flashcard.js'
-import { popAIJob } from '../queues/aiQueue.js'
 import { getIO } from '../socket/index.js'
-import redis from '../config/redis.js'
+import { BULLMQ_CONNECTION } from '../config/redis.js'
 
-const processAIJob = async (data) => {
-  if (data.type === 'flashcard') {
-    const { userId, roomId, topic } = data
+const processAIJob = async (job) => {
+  const { type } = job.data
+
+  if (type === 'flashcard') {
+    const { userId, roomId, topic } = job.data
     const prompt = `Generate 10 flashcards about "${topic}" in JSON format [{"question": "...", "answer": "..."}]`
     const io = getIO()
 
     try {
       const result = await getAIResponseStream(prompt, (chunk) => {
+        job.updateProgress({ stage: 'streaming', chunk })
         if (io && userId) {
           io.to(userId.toString()).emit('flashcard-ai-chunk', { chunk, topic })
         }
@@ -29,26 +32,28 @@ const processAIJob = async (data) => {
       if (io && userId) {
         io.to(userId.toString()).emit('flashcard-ai-complete', { flashcards: created, topic })
       }
+      return { flashcards: created.length, topic }
     } catch (err) {
       console.error('Flashcard generation error:', err.message)
       if (io && userId) {
         io.to(userId.toString()).emit('flashcard-ai-error', { error: 'Failed to generate flashcards. Try again.' })
       }
+      throw err
     }
-    return
   }
 
-  const { doubtId, title, description } = data
+  const { doubtId, title, description } = job.data
   if (doubtId) {
     const io = getIO()
     const doubt = await Doubt.findById(doubtId)
-    if (!doubt) return
+    if (!doubt) return { skipped: true }
 
     const roomId = doubt.room.toString()
     const prompt = `Answer this doubt in detail:\nTitle: ${title}\nDescription: ${description}`
 
     try {
       const result = await getAIResponseStream(prompt, (chunk) => {
+        job.updateProgress({ stage: 'streaming', chunk })
         if (io) {
           io.to(roomId).emit('doubt-ai-chunk', { doubtId, chunk })
         }
@@ -68,6 +73,7 @@ const processAIJob = async (data) => {
           aiAnswer: result.text,
         })
       }
+      return { doubtId, status: 'ai_answered' }
     } catch (err) {
       console.error('AI answer error for doubt', doubtId, ':', err.message)
 
@@ -85,20 +91,27 @@ const processAIJob = async (data) => {
           message: 'Sorry, AI service is unavailable right now. Please try again.',
         })
       }
+      throw err
     }
   }
 }
 
-export const startAIWorker = async () => {
-  console.log('AI worker started')
-  while (true) {
-    try {
-      const job = await popAIJob()
-      if (job) {
-        await processAIJob(job)
-      }
-    } catch (err) {
-      console.error('AI worker error:', err.message)
-    }
-  }
+let aiWorker
+
+export const startAIWorker = () => {
+  aiWorker = new Worker('ai', processAIJob, {
+    connection: BULLMQ_CONNECTION,
+    concurrency: 5,
+  })
+
+  aiWorker.on('completed', (job) => {
+    console.log(`AI job ${job.id} completed:`, job.returnvalue)
+  })
+
+  aiWorker.on('failed', (job, err) => {
+    console.error(`AI job ${job?.id} failed:`, err.message)
+  })
+
+  console.log('AI worker started (concurrency: 5)')
+  return aiWorker
 }

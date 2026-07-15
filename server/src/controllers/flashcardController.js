@@ -18,11 +18,25 @@ export const createFlashcard = async (req, res) => {
 
 export const getFlashcards = async (req, res) => {
   try {
-    const flashcards = await Flashcard.find({
-      user: req.user._id,
-      room: req.params.roomId,
-    }).sort({ createdAt: -1 })
-    res.json({ flashcards })
+    const { page = 1, limit = 20 } = req.query
+    const query = { user: req.user._id, room: req.params.roomId }
+
+    const skip = (Math.max(1, parseInt(page)) - 1) * parseInt(limit)
+    const total = await Flashcard.countDocuments(query)
+    const flashcards = await Flashcard.find(query)
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(Math.max(1, parseInt(limit)))
+
+    res.json({
+      flashcards,
+      pagination: {
+        page: Math.max(1, parseInt(page)),
+        limit: Math.max(1, parseInt(limit)),
+        total,
+        pages: Math.ceil(total / Math.max(1, parseInt(limit))),
+      },
+    })
   } catch (error) {
     res.status(500).json({ message: error.message })
   }

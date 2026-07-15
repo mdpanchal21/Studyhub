@@ -35,15 +35,30 @@ export const endSession = async (req, res) => {
 
 export const getSessions = async (req, res) => {
   try {
-    const sessions = await StudySession.find({ user: req.user._id })
+    const { page = 1, limit = 20 } = req.query
+    const query = { user: req.user._id }
+
+    const skip = (Math.max(1, parseInt(page)) - 1) * parseInt(limit)
+    const total = await StudySession.countDocuments(query)
+    const sessions = await StudySession.find(query)
       .populate('room', 'name')
       .populate({
         path: 'sessionGroup',
         populate: { path: 'members.user', select: 'name' },
       })
       .sort({ createdAt: -1 })
-      .limit(20)
-    res.json({ sessions })
+      .skip(skip)
+      .limit(Math.max(1, parseInt(limit)))
+
+    res.json({
+      sessions,
+      pagination: {
+        page: Math.max(1, parseInt(page)),
+        limit: Math.max(1, parseInt(limit)),
+        total,
+        pages: Math.ceil(total / Math.max(1, parseInt(limit))),
+      },
+    })
   } catch (error) {
     res.status(500).json({ message: error.message })
   }

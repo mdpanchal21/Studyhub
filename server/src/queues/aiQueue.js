@@ -1,17 +1,20 @@
-import redis from '../config/redis.js'
+import { Queue } from 'bullmq'
+import { BULLMQ_CONNECTION } from '../config/redis.js'
 
-const QUEUE_KEY = 'queue:ai'
+export const aiQueue = new Queue('ai', {
+  connection: BULLMQ_CONNECTION,
+  defaultJobOptions: {
+    attempts: 3,
+    backoff: { type: 'exponential', delay: 2000 },
+    removeOnComplete: { age: 3600 },
+    removeOnFail: { age: 86400 },
+  },
+})
 
 export const addAIJob = async (data) => {
-  await redis.lpush(QUEUE_KEY, JSON.stringify(data))
+  return aiQueue.add('doubt', data)
 }
 
 export const addFlashcardJob = async (data) => {
-  await redis.lpush(QUEUE_KEY, JSON.stringify({ ...data, type: 'flashcard' }))
-}
-
-export const popAIJob = async () => {
-  const result = await redis.brpop(QUEUE_KEY, 1)
-  if (!result) return null
-  return JSON.parse(result[1])
+  return aiQueue.add('flashcard', { ...data, type: 'flashcard' })
 }

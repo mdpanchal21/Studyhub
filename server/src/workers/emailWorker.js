@@ -1,5 +1,6 @@
+import { Worker } from 'bullmq'
 import nodemailer from 'nodemailer'
-import { popEmailJob } from '../queues/emailQueue.js'
+import { BULLMQ_CONNECTION } from '../config/redis.js'
 
 const getTransporter = () => {
   if (process.env.RESEND_API_KEY) {
@@ -21,31 +22,38 @@ const getTransporter = () => {
   return null
 }
 
-const processEmailJob = async (data) => {
+const processEmailJob = async (job) => {
   const transporter = getTransporter()
   if (!transporter) {
     console.log('Email not configured, skipping.')
-    return
+    return { skipped: true }
   }
   await transporter.sendMail({
     from: '"StudyHub" <noreply@studyhub.app>',
-    to: data.to,
-    subject: data.subject,
-    html: data.html,
+    to: job.data.to,
+    subject: job.data.subject,
+    html: job.data.html,
   })
-  console.log(`Email sent to ${data.to}`)
+  console.log(`Email sent to ${job.data.to}`)
+  return { sent: true, to: job.data.to }
 }
 
-export const startEmailWorker = async () => {
-  console.log('Email worker started')
-  while (true) {
-    try {
-      const job = await popEmailJob()
-      if (job) {
-        await processEmailJob(job)
-      }
-    } catch (err) {
-      console.error('Email worker error:', err.message)
-    }
-  }
+let emailWorker
+
+export const startEmailWorker = () => {
+  emailWorker = new Worker('email', processEmailJob, {
+    connection: BULLMQ_CONNECTION,
+    concurrency: 3,
+  })
+
+  emailWorker.on('completed', (job) => {
+    console.log(`Email job ${job.id} completed:`, job.returnvalue)
+  })
+
+  emailWorker.on('failed', (job, err) => {
+    console.error(`Email job ${job?.id} failed:`, err.message)
+  })
+
+  console.log('Email worker started (concurrency: 3)')
+  return emailWorker
 }

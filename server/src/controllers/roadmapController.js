@@ -68,10 +68,26 @@ export const getLatestRoadmap = async (req, res) => {
 
 export const listRoadmaps = async (req, res) => {
   try {
-    const roadmaps = await Roadmap.find({ user: req.user._id })
+    const { page = 1, limit = 10 } = req.query
+    const query = { user: req.user._id }
+
+    const skip = (Math.max(1, parseInt(page)) - 1) * parseInt(limit)
+    const total = await Roadmap.countDocuments(query)
+    const roadmaps = await Roadmap.find(query)
       .select('-plan')
       .sort({ createdAt: -1 })
-    res.json({ roadmaps })
+      .skip(skip)
+      .limit(Math.max(1, parseInt(limit)))
+
+    res.json({
+      roadmaps,
+      pagination: {
+        page: Math.max(1, parseInt(page)),
+        limit: Math.max(1, parseInt(limit)),
+        total,
+        pages: Math.ceil(total / Math.max(1, parseInt(limit))),
+      },
+    })
   } catch (error) {
     res.status(500).json({ message: error.message })
   }

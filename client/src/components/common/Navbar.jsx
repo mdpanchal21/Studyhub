@@ -8,13 +8,21 @@ export default function Navbar() {
   const { user, logout } = useAuth()
   const [notifications, setNotifications] = useState([])
   const [showDropdown, setShowDropdown] = useState(false)
+  const [notifPage, setNotifPage] = useState(1)
+  const [notifHasMore, setNotifHasMore] = useState(false)
 
   const unreadCount = notifications.filter((n) => !n.isRead).length
 
-  const fetchNotifications = useCallback(async () => {
+  const fetchNotifications = useCallback(async (page = 1) => {
     try {
-      const res = await notificationAPI.get()
-      setNotifications(res.data.notifications)
+      const res = await notificationAPI.get({ page, limit: 10 })
+      if (page === 1) {
+        setNotifications(res.data.notifications)
+      } else {
+        setNotifications((prev) => [...prev, ...res.data.notifications])
+      }
+      setNotifHasMore(res.data.pagination.page < res.data.pagination.pages)
+      setNotifPage(res.data.pagination.page)
     } catch {
       // silently fail — not critical
     }
@@ -22,11 +30,11 @@ export default function Navbar() {
 
   useEffect(() => {
     if (!user) return
-    fetchNotifications()
+    fetchNotifications(1)
 
     // Real-time: server emits 'new-notification' to the user's personal socket room
     const unsub = onSocketEvent('new-notification', (notification) => {
-      setNotifications((prev) => [notification, ...prev].slice(0, 20))
+      setNotifications((prev) => [notification, ...prev].slice(0, 30))
     })
 
     return unsub
@@ -110,27 +118,37 @@ export default function Navbar() {
                         No notifications yet
                       </p>
                     ) : (
-                      notifications.map((n) => (
-                        <div
-                          key={n._id}
-                          onClick={() => handleMarkRead(n._id)}
-                          className={`cursor-pointer px-4 py-3 transition hover:bg-white/5 ${
-                            !n.isRead ? 'bg-teal-500/10' : ''
-                          }`}
-                        >
-                          {n.link ? (
-                            <Link
-                              to={n.link}
-                              onClick={() => setShowDropdown(false)}
-                              className="block"
-                            >
+                      <>
+                        {notifications.map((n) => (
+                          <div
+                            key={n._id}
+                            onClick={() => handleMarkRead(n._id)}
+                            className={`cursor-pointer px-4 py-3 transition hover:bg-white/5 ${
+                              !n.isRead ? 'bg-teal-500/10' : ''
+                            }`}
+                          >
+                            {n.link ? (
+                              <Link
+                                to={n.link}
+                                onClick={() => setShowDropdown(false)}
+                                className="block"
+                              >
+                                <NotificationItem n={n} />
+                              </Link>
+                            ) : (
                               <NotificationItem n={n} />
-                            </Link>
-                          ) : (
-                            <NotificationItem n={n} />
-                          )}
-                        </div>
-                      ))
+                            )}
+                          </div>
+                        ))}
+                        {notifHasMore && (
+                          <button
+                            onClick={() => fetchNotifications(notifPage + 1)}
+                            className="w-full py-2.5 text-xs text-teal-400 hover:text-teal-300 hover:bg-white/5 transition"
+                          >
+                            Load more
+                          </button>
+                        )}
+                      </>
                     )}
                   </div>
                 </div>
@@ -170,7 +188,7 @@ function NotificationItem({ n }) {
         </p>
       </div>
       {!n.isRead && (
-        <span className="mt-1.5 h-2 w-2 flex-shrink-0 rounded-full bg-teal-400 shadow-[0_0_0_4px_rgba(45,212,191,0.16)]" />
+        <span className="mt-1.5 h-2 w-2 flex-shrink-0 rounded-full bg-amber-500 shadow-[0_0_0_4px_rgba(245,158,11,0.16)]" />
       )}
     </div>
   )

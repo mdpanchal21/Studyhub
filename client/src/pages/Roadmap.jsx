@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { roadmapAPI } from '../services/api'
 import Skeleton from 'react-loading-skeleton'
 import toast from 'react-hot-toast'
+import Pagination from '../components/common/Pagination'
 
 function RoadmapSkeleton() {
   return (
@@ -78,6 +79,7 @@ function RoadmapView({ roadmap }) {
 export default function Roadmap() {
   const [roadmap, setRoadmap] = useState(null)
   const [roadmaps, setRoadmaps] = useState([])
+  const [roadmapPagination, setRoadmapPagination] = useState({ page: 1, pages: 1, total: 0 })
   const [loadingRoadmap, setLoadingRoadmap] = useState(true)
   const [generating, setGenerating] = useState(false)
   const [partialRoadmap, setPartialRoadmap] = useState(null)
@@ -106,17 +108,18 @@ export default function Roadmap() {
     }
   }
 
-  const fetchRoadmaps = async () => {
+  const fetchRoadmaps = useCallback(async (page = 1) => {
     setLoadingHistory(true)
     try {
-      const res = await roadmapAPI.list()
+      const res = await roadmapAPI.list({ page, limit: 5 })
       setRoadmaps(res.data.roadmaps || [])
+      setRoadmapPagination(res.data.pagination)
     } catch {
       // silent
     } finally {
       setLoadingHistory(false)
     }
-  }
+  }, [])
 
   const loadRoadmap = async (id) => {
     try {
@@ -131,8 +134,8 @@ export default function Roadmap() {
 
   useEffect(() => {
     fetchRoadmap()
-    fetchRoadmaps()
-  }, [])
+    fetchRoadmaps(1)
+  }, [fetchRoadmaps])
 
   const handleCreateRoadmap = async (e) => {
     e.preventDefault()
@@ -191,7 +194,7 @@ export default function Roadmap() {
               setPartialRoadmap(null)
               setGenerating(false)
               toast.success('Roadmap generated')
-              fetchRoadmaps()
+              fetchRoadmaps(1)
             } else if (data.type === 'error') {
               toast.error(data.message)
               setGenerating(false)
@@ -388,7 +391,7 @@ export default function Roadmap() {
       </div>
 
       {/* Past roadmaps */}
-      {roadmaps.length > 1 && (
+      {roadmapPagination.total > 0 && (
         <div className="mt-6">
           <button
             onClick={() => setShowHistory((v) => !v)}
@@ -400,7 +403,7 @@ export default function Roadmap() {
             >
               <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
             </svg>
-            Past roadmaps ({roadmaps.length - 1})
+            Past roadmaps ({roadmapPagination.total - 1})
           </button>
 
           {showHistory && (
@@ -408,28 +411,35 @@ export default function Roadmap() {
               {loadingHistory ? (
                 <p className="text-sm text-slate-500">Loading...</p>
               ) : (
-                roadmaps
-                  .filter((r) => r._id !== roadmap?._id)
-                  .map((r) => (
-                    <button
-                      key={r._id}
-                      onClick={() => loadRoadmap(r._id)}
-                      className="w-full text-left surface rounded-xl p-4 transition hover:bg-white/[0.07]"
-                    >
-                      <div className="flex items-center justify-between gap-3 flex-wrap">
-                        <div className="min-w-0">
-                          <p className="text-sm font-medium text-slate-200 truncate">
-                            {r.title || `${r.targetRole} study roadmap`}
-                          </p>
-                          <p className="text-xs text-slate-500 mt-0.5">
-                            {r.targetRole} &middot; {r.durationWeeks} weeks &middot;{' '}
-                            {new Date(r.createdAt).toLocaleDateString()}
-                          </p>
+                <>
+                  {roadmaps
+                    .filter((r) => r._id !== roadmap?._id)
+                    .map((r) => (
+                      <button
+                        key={r._id}
+                        onClick={() => loadRoadmap(r._id)}
+                        className="w-full text-left surface rounded-xl p-4 transition hover:bg-white/[0.07]"
+                      >
+                        <div className="flex items-center justify-between gap-3 flex-wrap">
+                          <div className="min-w-0">
+                            <p className="text-sm font-medium text-slate-200 truncate">
+                              {r.title || `${r.targetRole} study roadmap`}
+                            </p>
+                            <p className="text-xs text-slate-500 mt-0.5">
+                              {r.targetRole} &middot; {r.durationWeeks} weeks &middot;{' '}
+                              {new Date(r.createdAt).toLocaleDateString()}
+                            </p>
+                          </div>
+                          <span className="text-xs text-teal-400 whitespace-nowrap">Load &rarr;</span>
                         </div>
-                        <span className="text-xs text-teal-400 whitespace-nowrap">Load &rarr;</span>
-                      </div>
-                    </button>
-                  ))
+                      </button>
+                    ))}
+                  <Pagination
+                    page={roadmapPagination.page}
+                    totalPages={roadmapPagination.pages}
+                    onPageChange={(p) => fetchRoadmaps(p)}
+                  />
+                </>
               )}
             </div>
           )}

@@ -1,14 +1,24 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { sessionAPI } from '../services/api'
+import Pagination from '../components/common/Pagination'
 
 export default function Profile() {
   const { user } = useAuth()
   const [sessions, setSessions] = useState([])
+  const [sessionPagination, setSessionPagination] = useState({ page: 1, pages: 1, total: 0 })
+
+  const fetchSessions = useCallback(async (page = 1) => {
+    try {
+      const res = await sessionAPI.getAll({ page, limit: 10 })
+      setSessions(res.data.sessions)
+      setSessionPagination(res.data.pagination)
+    } catch {}
+  }, [])
 
   useEffect(() => {
-    sessionAPI.getAll().then((res) => setSessions(res.data.sessions)).catch(() => {})
-  }, [])
+    fetchSessions(1)
+  }, [fetchSessions])
 
   const totalMinutes = sessions.reduce((sum, s) => sum + (s.durationMinutes || 0), 0)
 
@@ -26,7 +36,7 @@ export default function Profile() {
         </div>
         <div className="grid grid-cols-3 gap-4 mt-6 text-center">
           <div className="bg-indigo-50 rounded-lg p-3">
-            <p className="text-2xl font-bold text-indigo-600">{sessions.length}</p>
+            <p className="text-2xl font-bold text-indigo-600">{sessionPagination.total}</p>
             <p className="text-xs text-gray-500">Sessions</p>
           </div>
           <div className="bg-green-50 rounded-lg p-3">
@@ -73,6 +83,11 @@ export default function Profile() {
               </div>
             ))}
           </div>
+          <Pagination
+            page={sessionPagination.page}
+            totalPages={sessionPagination.pages}
+            onPageChange={(p) => fetchSessions(p)}
+          />
         </div>
       )}
     </div>

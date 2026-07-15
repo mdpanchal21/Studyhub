@@ -4,6 +4,7 @@ import StudySession from '../components/flashcards/StudySession'
 import QuizView from '../components/flashcards/QuizView'
 import QuizHistory from '../components/flashcards/QuizHistory'
 import TopicSelect from '../components/flashcards/TopicSelect'
+import Pagination from '../components/common/Pagination'
 import { on } from '../services/socket'
 import toast from 'react-hot-toast'
 
@@ -16,6 +17,7 @@ export default function Flashcards() {
   const [quizQuestions, setQuizQuestions] = useState([])
   const [loading, setLoading] = useState(false)
   const [savedQuizzes, setSavedQuizzes] = useState([])
+  const [quizPagination, setQuizPagination] = useState({ page: 1, pages: 1, total: 0 })
   const [savedQuiz, setSavedQuiz] = useState(null)
   const [selectedTopic, setSelectedTopic] = useState('')
   const [selectedTopics, setSelectedTopics] = useState([])
@@ -34,16 +36,17 @@ export default function Flashcards() {
     ? flashcards.filter(f => (f.topic || 'Untitled') === selectedTopic)
     : flashcards
 
-  const loadQuizzes = useCallback(async () => {
+  const loadQuizzes = useCallback(async (page = 1) => {
     try {
-      const res = await quizAPI.list()
+      const res = await quizAPI.list({ page, limit: 10 })
       setSavedQuizzes(res.data.quizzes)
+      setQuizPagination(res.data.pagination)
     } catch {}
   }, [])
 
   useEffect(() => {
     roomAPI.getAll().then((res) => setRooms(res.data.rooms)).catch(() => {})
-    loadQuizzes()
+    loadQuizzes(1)
   }, [loadQuizzes])
 
   const fetchFlashcards = async (roomId) => {
@@ -137,7 +140,7 @@ export default function Flashcards() {
     { key: 'cards', label: 'My Cards', count: flashcards.length },
     { key: 'study', label: 'Study', count: null },
     { key: 'quiz', label: 'Quiz', count: quizQuestions.length || savedQuiz ? 'Live' : null },
-    { key: 'history', label: 'History', count: savedQuizzes.length || null },
+    { key: 'history', label: 'History', count: quizPagination.total || null },
   ]
 
   return (
@@ -232,7 +235,7 @@ export default function Flashcards() {
               >
                 <div
                   className="w-1.5 h-10 rounded-full shrink-0"
-                  style={{ backgroundColor: ['#6366f1', '#8b5cf6', '#a855f7', '#d946ef', '#ec4899'][i % 5] }}
+                  style={{ backgroundColor: ['#f59e0b', '#d97706', '#b45309', '#92400e', '#78350f'][i % 5] }}
                 />
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-semibold text-gray-800 group-hover:text-indigo-600 transition">{t.name}</p>
@@ -351,7 +354,14 @@ export default function Flashcards() {
       )}
 
       {mode === 'history' && (
-        <QuizHistory quizzes={savedQuizzes} onViewQuiz={handleViewQuiz} />
+        <div>
+          <QuizHistory quizzes={savedQuizzes} onViewQuiz={handleViewQuiz} />
+          <Pagination
+            page={quizPagination.page}
+            totalPages={quizPagination.pages}
+            onPageChange={(p) => loadQuizzes(p)}
+          />
+        </div>
       )}
     </div>
   )

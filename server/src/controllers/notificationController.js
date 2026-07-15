@@ -2,10 +2,25 @@ import Notification from '../models/Notification.js'
 
 export const getNotifications = async (req, res) => {
   try {
-    const notifications = await Notification.find({ user: req.user._id })
+    const { page = 1, limit = 20 } = req.query
+    const query = { user: req.user._id }
+
+    const skip = (Math.max(1, parseInt(page)) - 1) * parseInt(limit)
+    const total = await Notification.countDocuments(query)
+    const notifications = await Notification.find(query)
       .sort({ createdAt: -1 })
-      .limit(20)
-    res.json({ notifications })
+      .skip(skip)
+      .limit(Math.max(1, parseInt(limit)))
+
+    res.json({
+      notifications,
+      pagination: {
+        page: Math.max(1, parseInt(page)),
+        limit: Math.max(1, parseInt(limit)),
+        total,
+        pages: Math.ceil(total / Math.max(1, parseInt(limit))),
+      },
+    })
   } catch (error) {
     res.status(500).json({ message: error.message })
   }

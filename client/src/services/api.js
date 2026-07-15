@@ -62,7 +62,7 @@ export const doubtAPI = {
 }
 
 export const flashcardAPI = {
-  get: (roomId) => api.get(`/flashcards/${roomId}`),
+  get: (roomId, params) => api.get(`/flashcards/${roomId}`, { params }),
   create: (roomId, data) => api.post(`/flashcards/${roomId}`, data),
   generate: (roomId, topic) => api.post(`/flashcards/${roomId}/generate`, { topic }),
   delete: (id) => api.delete(`/flashcards/${id}`),
@@ -71,11 +71,11 @@ export const flashcardAPI = {
 export const sessionAPI = {
   start: (roomId) => api.post(`/sessions/${roomId}/start`),
   end: (id) => api.patch(`/sessions/${id}/end`),
-  getAll: () => api.get('/sessions'),
+  getAll: (params) => api.get('/sessions', { params }),
 }
 
 export const notificationAPI = {
-  get: () => api.get('/notifications'),
+  get: (params) => api.get('/notifications', { params }),
   markRead: (id) => api.patch(`/notifications/${id}/read`),
   markAllRead: () => api.patch('/notifications/read-all'),
 }
@@ -88,12 +88,12 @@ export const aiAPI = {
 
 export const quizAPI = {
   save: (data) => api.post('/quizzes', data),
-  list: () => api.get('/quizzes'),
+  list: (params) => api.get('/quizzes', { params }),
   getOne: (id) => api.get(`/quizzes/${id}`),
 }
 
 export const roadmapAPI = {
-  list: () => api.get('/roadmaps'),
+  list: (params) => api.get('/roadmaps', { params }),
   getLatest: () => api.get('/roadmaps/latest'),
   getOne: (id) => api.get(`/roadmaps/${id}`),
   create: (data) => api.post('/roadmaps', data),

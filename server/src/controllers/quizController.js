@@ -20,11 +20,27 @@ export const saveQuiz = async (req, res) => {
 
 export const getQuizzes = async (req, res) => {
   try {
-    const quizzes = await Quiz.find({ user: req.user._id })
+    const { page = 1, limit = 20 } = req.query
+    const query = { user: req.user._id }
+
+    const skip = (Math.max(1, parseInt(page)) - 1) * parseInt(limit)
+    const total = await Quiz.countDocuments(query)
+    const quizzes = await Quiz.find(query)
       .select('topic score total createdAt room')
       .populate('room', 'name')
-      .sort('-createdAt')
-    res.json({ quizzes })
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(Math.max(1, parseInt(limit)))
+
+    res.json({
+      quizzes,
+      pagination: {
+        page: Math.max(1, parseInt(page)),
+        limit: Math.max(1, parseInt(limit)),
+        total,
+        pages: Math.ceil(total / Math.max(1, parseInt(limit))),
+      },
+    })
   } catch (error) {
     res.status(500).json({ message: error.message })
   }
