@@ -99,6 +99,14 @@ export const roadmapAPI = {
   create: (data) => api.post('/roadmaps', data),
 }
 
+export const fileAPI = {
+  upload: (roomId, formData) => api.post(`/files/${roomId}/upload`, formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  }),
+  list: (roomId, params) => api.get(`/files/${roomId}`, { params }),
+  delete: (id) => api.delete(`/files/${id}`),
+}
+
 export const roomSessionAPI = {
   getActive: (roomId) => api.get(`/rooms/${roomId}/active-session`),
   start: (roomId, topic) => api.post(`/rooms/${roomId}/sessions/start`, { topic }),

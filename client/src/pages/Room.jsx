@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { roomAPI, messageAPI, doubtAPI, flashcardAPI, roomSessionAPI } from '../services/api'
+import { roomAPI, messageAPI, doubtAPI, flashcardAPI, roomSessionAPI, fileAPI } from '../services/api'
 import { getSocket, onReconnect, on as onSocketEvent } from '../services/socket'
 import { useAuth } from '../context/AuthContext'
 import { useSocket } from '../context/SocketContext'
@@ -13,6 +13,9 @@ import DoubtForm from '../components/doubts/DoubtForm'
 import FlashcardList from '../components/flashcards/FlashcardList'
 import Skeleton from 'react-loading-skeleton'
 import VideoCall from '../components/video/VideoCall'
+import FileUpload from '../components/files/FileUpload'
+import FileList from '../components/files/FileList'
+import FilePreview from '../components/files/FilePreview'
 import toast from 'react-hot-toast'
 
 export default function Room() {
@@ -54,6 +57,8 @@ export default function Room() {
   const [loadingOlder, setLoadingOlder] = useState(false)
   const [generatingFlashcards, setGeneratingFlashcards] = useState(false)
   const [flashcardStream, setFlashcardStream] = useState('')
+  const [files, setFiles] = useState([])
+  const [filePreview, setFilePreview] = useState(null)
 
   useEffect(() => {
     roomAPI.getOne(id)
@@ -70,6 +75,10 @@ export default function Room() {
       .finally(() => setLoading(false))
   }, [id])
 
+  const fetchFiles = useCallback(() => {
+    fileAPI.list(id).then((res) => setFiles(res.data.files)).catch(() => {})
+  }, [id])
+
   const fetchData = useCallback(() => {
     messageAPI.get(id).then((res) => {
       setMessages(res.data.messages)
@@ -77,7 +86,8 @@ export default function Room() {
     }).catch(() => {})
     flashcardAPI.get(id).then((res) => setFlashcards(res.data.flashcards)).catch(() => {})
     roomSessionAPI.getActive(id).then((res) => setRoomSession(res.data.session)).catch(() => {})
-  }, [id])
+    fetchFiles()
+  }, [id, fetchFiles])
 
   useEffect(() => { fetchData() }, [fetchData])
 
@@ -295,6 +305,15 @@ export default function Room() {
       onSocketEvent('room-deactivated', ({ roomName }) => {
         toast(`${roomName || 'Room'} was deactivated by the admin`, { icon: '🚫' })
         navigate('/')
+      }),
+      onSocketEvent('new-file', ({ file }) => {
+        setFiles((prev) => {
+          const exists = prev.some((f) => f._id === file._id)
+          return exists ? prev : [file, ...prev]
+        })
+      }),
+      onSocketEvent('file-deleted', ({ fileId }) => {
+        setFiles((prev) => prev.filter((f) => f._id !== fileId))
       }),
     ]
 
@@ -568,6 +587,7 @@ export default function Room() {
     { key: 'chat', label: 'Chat' },
     { key: 'doubts', label: 'Doubts' },
     { key: 'flashcards', label: 'Flashcards' },
+    { key: 'files', label: `Files (${files.length})` },
     { key: 'members', label: `Members (${room.members?.length || 0})` },
   ]
 
@@ -641,7 +661,7 @@ export default function Room() {
             loadingOlder={loadingOlder}
           />
               <TypingIndicator users={typingUsers} />
-              <MessageInput onSend={handleSendMessage} onTyping={handleTyping} />
+              <MessageInput onSend={handleSendMessage} onTyping={handleTyping} roomId={id} />
             </>
           )}
           {activeTab === 'doubts' && (
@@ -723,6 +743,17 @@ export default function Room() {
                 </div>
               )}
               <FlashcardList flashcards={flashcards} onDelete={handleDeleteFlashcard} />
+            </div>
+          )}
+          {activeTab === 'files' && (
+            <div className="flex-1 overflow-y-auto p-4 space-y-4">
+              <FileUpload roomId={id} onUploadComplete={fetchFiles} />
+              <FileList
+                files={files}
+                currentUserId={user?._id}
+                onDelete={(fileId) => setFiles((prev) => prev.filter((f) => f._id !== fileId))}
+                onPreview={setFilePreview}
+              />
             </div>
           )}
           {activeTab === 'members' && (
@@ -893,6 +924,8 @@ export default function Room() {
           </div>
         </div>
       )}
+
+      <FilePreview file={filePreview} onClose={() => setFilePreview(null)} />
     </div>
   )
 }

@@ -111,6 +111,18 @@ const setupSocket = (server, app) => {
       socket.to(data.roomId).emit('session-update', data)
     })
 
+    // ─── Files ───────────────────────────────────────────────────────────────
+
+    socket.on('new-file', (data) => {
+      if (!data?.roomId || !data?.file) return
+      socket.to(data.roomId).emit('new-file', data)
+    })
+
+    socket.on('file-deleted', (data) => {
+      if (!data?.roomId || !data?.fileId) return
+      socket.to(data.roomId).emit('file-deleted', data)
+    })
+
     // ─── Disconnect ────────────────────────────────────────────────────────
 
     socket.on('disconnect', (reason) => {
