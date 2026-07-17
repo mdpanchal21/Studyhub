@@ -27,12 +27,18 @@ export const getMessages = async (req, res) => {
 
 export const sendMessage = async (req, res) => {
   try {
-    const { content, type } = req.body
+    const { content, type, fileUrl, fileName, fileSize, fileType, mimeType, fileRef } = req.body
     const message = await Message.create({
       room: req.params.roomId,
       sender: req.user._id,
       content,
       type: type || 'text',
+      fileUrl: fileUrl || null,
+      fileName: fileName || null,
+      fileSize: fileSize || null,
+      fileType: fileType || null,
+      mimeType: mimeType || null,
+      fileRef: fileRef || null,
     })
     const populated = await message.populate('sender', 'name email avatar')
     res.status(201).json({ message: populated })

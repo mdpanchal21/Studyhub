@@ -1,7 +1,9 @@
 import multer from 'multer'
 import { CloudinaryStorage } from 'multer-storage-cloudinary'
+
 import cloudinary from '../config/cloudinary.js'
 import File from '../models/File.js'
+import Room from '../models/Room.js'
 
 const ALLOWED_TYPES = {
   'image/jpeg': 'image',
@@ -121,6 +123,63 @@ export const deleteFile = async (req, res) => {
 
     res.json({ message: 'File deleted' })
   } catch (error) {
+    res.status(500).json({ message: error.message })
+  }
+}
+
+export const downloadFile = async (req, res) => {
+  try {
+    const { url, fileName } = req.query
+
+    if (!url) {
+      return res.status(400).json({ message: 'No file URL provided' })
+    }
+
+    const decodedUrl = decodeURIComponent(url)
+    const name = fileName || 'download'
+    console.log('[Download] original URL:', decodedUrl)
+
+    const parts = decodedUrl.split('/upload/')
+    if (parts.length !== 2) {
+      return res.status(400).json({ message: 'Invalid URL format' })
+    }
+
+    const afterUpload = parts[1]
+    const versionMatch = afterUpload.match(/^v(\d+)\//)
+    const version = versionMatch ? parseInt(versionMatch[1]) : undefined
+    const publicIdWithExt = versionMatch ? afterUpload.slice(versionMatch[0].length) : afterUpload
+
+    const dotIndex = publicIdWithExt.lastIndexOf('.')
+    const publicId = dotIndex > 0 ? publicIdWithExt.slice(0, dotIndex) : publicIdWithExt
+    const format = dotIndex > 0 ? publicIdWithExt.slice(dotIndex + 1) : 'pdf'
+
+    console.log('[Download] publicId:', publicId, 'format:', format, 'version:', version)
+
+    const downloadUrl = cloudinary.utils.private_download_url(publicId, format, {
+      resource_type: 'image',
+      type: 'upload',
+      version,
+    })
+    console.log('[Download] download URL generated')
+
+    const response = await fetch(downloadUrl)
+    console.log('[Download] status:', response.status, 'type:', response.headers.get('content-type'))
+
+    if (!response.ok) {
+      return res.status(502).json({ message: 'Failed to fetch file from storage' })
+    }
+
+    const contentType = response.headers.get('content-type') || 'application/octet-stream'
+    const contentLength = response.headers.get('content-length')
+    res.setHeader('Content-Type', contentType)
+    res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(name)}"`)
+    if (contentLength) res.setHeader('Content-Length', contentLength)
+
+    const buffer = Buffer.from(await response.arrayBuffer())
+    console.log('[Download] success, bytes:', buffer.length)
+    return res.end(buffer)
+  } catch (error) {
+    console.error('[Download] error:', error)
     res.status(500).json({ message: error.message })
   }
 }

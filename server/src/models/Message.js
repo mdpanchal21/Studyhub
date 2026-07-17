@@ -4,7 +4,13 @@ const messageSchema = new mongoose.Schema({
   room: { type: mongoose.Schema.Types.ObjectId, ref: 'Room', required: true },
   sender: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   content: { type: String, required: true },
-  type: { type: String, enum: ['text', 'code', 'image'], default: 'text' },
+  type: { type: String, enum: ['text', 'code', 'image', 'file'], default: 'text' },
+  fileUrl: { type: String, default: null },
+  fileName: { type: String, default: null },
+  fileSize: { type: Number, default: null },
+  fileType: { type: String, default: null },
+  mimeType: { type: String, default: null },
+  fileRef: { type: mongoose.Schema.Types.ObjectId, ref: 'File', default: null },
 }, { timestamps: true })
 
 messageSchema.index({ createdAt: 1 }, { expireAfterSeconds: 604800 })

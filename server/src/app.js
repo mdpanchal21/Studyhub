@@ -3,7 +3,7 @@ import cors from 'cors'
 import morgan from 'morgan'
 import cookieParser from 'cookie-parser'
 import { errorHandler } from './middleware/errorHandler.js'
-import { globalLimiter, authLimiter, aiLimiter } from './middleware/rateLimiter.js'
+import { authLimiter, aiLimiter } from './middleware/rateLimiter.js'
 
 import authRoutes from './routes/auth.js'
 import oauthRoutes from './routes/oauth.js'
@@ -26,7 +26,6 @@ app.use(cors({ origin: process.env.CLIENT_URL.split(','), credentials: true }))
 app.use(express.json())
 app.use(cookieParser())
 app.use(morgan('dev'))
-app.use(globalLimiter)
 
 app.use('/api/auth', authLimiter, authRoutes)
 app.use('/api/auth', authLimiter, oauthRoutes)

@@ -333,6 +333,26 @@ export default function Room() {
     }
   }, [id])
 
+  const handleSendFile = useCallback(async (fileData) => {
+    const socket = getSocket()
+    try {
+      const res = await messageAPI.send(id, {
+        content: fileData.fileName,
+        type: 'file',
+        fileRef: fileData.fileRef,
+        fileUrl: fileData.fileUrl,
+        fileName: fileData.fileName,
+        fileSize: fileData.fileSize,
+        fileType: fileData.fileType,
+        mimeType: fileData.mimeType,
+      })
+      setMessages((prev) => [...prev, res.data.message])
+      socket?.emit('broadcast-message', { roomId: id, message: res.data.message })
+    } catch {
+      toast.error('Failed to send file message')
+    }
+  }, [id])
+
   const loadOlderMessages = async () => {
     if (loadingOlder || !messages.length) return
     setLoadingOlder(true)
@@ -659,9 +679,10 @@ export default function Room() {
             onLoadOlder={loadOlderMessages}
             hasMore={hasMoreMessages}
             loadingOlder={loadingOlder}
+            onFilePreview={setFilePreview}
           />
               <TypingIndicator users={typingUsers} />
-              <MessageInput onSend={handleSendMessage} onTyping={handleTyping} roomId={id} />
+              <MessageInput onSend={handleSendMessage} onTyping={handleTyping} roomId={id} onSendFile={handleSendFile} />
             </>
           )}
           {activeTab === 'doubts' && (

@@ -105,6 +105,22 @@ export const fileAPI = {
   }),
   list: (roomId, params) => api.get(`/files/${roomId}`, { params }),
   delete: (id) => api.delete(`/files/${id}`),
+  download: async (id, fileName, fileUrl) => {
+    const token = localStorage.getItem('token')
+    const res = await fetch(`/api/files/download?url=${encodeURIComponent(fileUrl || '')}&fileName=${encodeURIComponent(fileName || 'download')}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+    if (!res.ok) throw new Error('Download failed')
+    const blob = await res.blob()
+    const blobUrl = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = blobUrl
+    a.download = fileName
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    URL.revokeObjectURL(blobUrl)
+  },
 }
 
 export const roomSessionAPI = {

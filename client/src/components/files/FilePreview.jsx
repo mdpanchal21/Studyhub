@@ -1,6 +1,22 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
+import { fileAPI } from '../../services/api'
+import toast from 'react-hot-toast'
 
 export default function FilePreview({ file, onClose }) {
+  const [downloading, setDownloading] = useState(false)
+
+  const handleDownload = async () => {
+    if (!file) return
+    setDownloading(true)
+    try {
+      await fileAPI.download(file._id, file.fileName, file.fileUrl)
+    } catch {
+      toast.error('Download failed')
+    } finally {
+      setDownloading(false)
+    }
+  }
+
   useEffect(() => {
     const handleEsc = (e) => {
       if (e.key === 'Escape') onClose()
@@ -28,14 +44,13 @@ export default function FilePreview({ file, onClose }) {
             {file.fileName}
           </h3>
           <div className="flex items-center gap-2">
-            <a
-              href={file.fileUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-xs px-3 py-1.5 bg-white/10 rounded-lg hover:bg-white/20 transition text-stone-200"
+            <button
+              onClick={handleDownload}
+              disabled={downloading}
+              className="text-xs px-3 py-1.5 bg-white/10 rounded-lg hover:bg-white/20 transition text-stone-200 disabled:opacity-40"
             >
-              Download
-            </a>
+              {downloading ? 'Downloading...' : 'Download'}
+            </button>
             <button
               onClick={onClose}
               className="p-1.5 rounded-lg hover:bg-white/10 transition text-stone-400 hover:text-white"
@@ -64,14 +79,13 @@ export default function FilePreview({ file, onClose }) {
             <div className="text-center p-8">
               <div className="text-5xl mb-4">📁</div>
               <p className="text-stone-400 text-sm mb-4">Preview not available for this file type</p>
-              <a
-                href={file.fileUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="px-4 py-2 bg-amber-400 text-stone-900 rounded-lg text-sm font-medium hover:bg-amber-300 transition"
+              <button
+                onClick={handleDownload}
+                disabled={downloading}
+                className="px-4 py-2 bg-amber-400 text-stone-900 rounded-lg text-sm font-medium hover:bg-amber-300 transition disabled:opacity-40"
               >
-                Download to view
-              </a>
+                {downloading ? 'Downloading...' : 'Download to view'}
+              </button>
             </div>
           )}
         </div>

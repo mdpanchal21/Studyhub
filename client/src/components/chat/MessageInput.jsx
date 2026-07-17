@@ -2,7 +2,7 @@ import { useState, useRef } from 'react'
 import { fileAPI } from '../../services/api'
 import toast from 'react-hot-toast'
 
-export default function MessageInput({ onSend, onTyping, roomId }) {
+export default function MessageInput({ onSend, onTyping, roomId, onSendFile }) {
   const [text, setText] = useState('')
   const [uploading, setUploading] = useState(false)
   const fileInputRef = useRef(null)
@@ -27,7 +27,16 @@ export default function MessageInput({ onSend, onTyping, roomId }) {
 
     setUploading(true)
     try {
-      await fileAPI.upload(roomId, formData)
+      const res = await fileAPI.upload(roomId, formData)
+      const uploaded = res.data.file
+      onSendFile?.({
+        fileRef: uploaded._id,
+        fileUrl: uploaded.fileUrl,
+        fileName: uploaded.fileName,
+        fileSize: uploaded.fileSize,
+        fileType: uploaded.fileType,
+        mimeType: uploaded.mimeType,
+      })
       toast.success('File shared')
     } catch (err) {
       toast.error(err.response?.data?.message || 'Upload failed')
